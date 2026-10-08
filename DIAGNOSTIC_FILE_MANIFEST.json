@@ -1,0 +1,168 @@
+{
+  "task": "CTS_LEC_DIAGNOSTIC_PATCH_PREPARATION_V1",
+  "date": "2026-10-08",
+  "local_repo": "E:\\AUTONOMOUS_EDA_V1\\workspace\\autonomous-eda-gcd-baseline",
+  "base_local_commit": "c884df48aa8d49ebd61813b5e1f9ce14d99a7a28",
+  "frozen_experiment": {
+    "project": "AUTONOMOUS_EDA_PROTOTYPE_EXPLORATION_V1",
+    "orfs_commit": "3a964e13f11a4e435aac01ffa14db0a7d2853720",
+    "orfs_image": "openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9",
+    "design": "gcd",
+    "platform": "nangate45",
+    "testbench_sha256": "3ecf0e4e9b840d1185feae9e5c6a87c68d34702b7208c82d52c2408eac5c892f",
+    "rtl_sha256": "5009f224876d39e5e77e59ee1528cb0d2a03697251f0971b77cf3e8b0426dd3e"
+  },
+  "frozen_inputs": [
+    {
+      "path": "flow/designs/src/gcd/gcd.v",
+      "git_blob": "846d2333cbcd58f8d46a834ad13442410d55834c",
+      "sha256": "5009f224876d39e5e77e59ee1528cb0d2a03697251f0971b77cf3e8b0426dd3e"
+    },
+    {
+      "path": "flow/designs/nangate45/gcd/config.mk",
+      "git_blob": "8d77fbe786cd3b53178a7168f8fe76f29c0a65c6",
+      "sha256": "ebc6c7a30ff59c00bdc177b34a59d3c667e0c9698b4c0c4aba73486ea044b737"
+    },
+    {
+      "path": "flow/designs/nangate45/gcd/constraint.sdc",
+      "git_blob": "cb90dd009013a44d6ae93348d3f3b4eca126e0c7",
+      "sha256": "952a1a0a6de30877f585ee924004ce66151ff8325ec77e274fd92d1fdbf36582"
+    },
+    {
+      "path": "flow/designs/nangate45/gcd/grid_strategy-M1-M4-M7.tcl",
+      "git_blob": "124e9a32cc6cbb655fd3ae4f4a61270cdb09aef5",
+      "sha256": "ce05092076f0494e3ec382d48ac1af19f34818a03c7fa06f19d76327da16917e"
+    },
+    {
+      "path": "flow/designs/nangate45/gcd/rules-base.json",
+      "git_blob": "589dd1efdf4bdb5e9fcbed37d9670d67d45d91e9",
+      "sha256": "015239b1b49760cdf7316fe091ab6d54fcdd7a73845ecb660d3e06a00d1e6d5d"
+    },
+    {
+      "path": "flow/platforms/nangate45/config.mk",
+      "git_blob": "0a69b6642edfd69c477f6f5a5344bd0f3194d816",
+      "sha256": "1d8e639ccc138e72b5fe02dc0130e167455aee1c53b5aa3ee50ff442dc47d6cc"
+    }
+  ],
+  "original_13_file_hashes": {
+    ".gitattributes": "eae31c0293db0e3ae366356cfa733ead56930027c8e7f5bed03c62f37f9f7997",
+    ".github/workflows/orfs_gcd_baseline.yml": "a8ba7af576f118abb00dedd7b37fc8ab13a1be636651cda9ae9ef81f19d8a0b4",
+    ".gitignore": "84d77c4d979b0ca705f90594f087289725f2ab73ed95e5b40a3607a2f61e20bd",
+    "README.md": "027646c23c7ba0cbaa74fb0270799c844d2186d3323fecce864df5953a8aee07",
+    "experiment_identity.json": "ceb65db4a0ebd17e4c7d23241729a5ae2b644add01a7f53439699ecdc17794f3",
+    "scripts/check_gds.py": "f6d52eda4684e017f89524b7282069c9f55a2716395a6e4db4eee8785e2de1d8",
+    "scripts/check_inputs.py": "02ede91217b26bc48406d0ee30a4a3ef6a33aae15df706b1cc9c26f92ef8a27b",
+    "scripts/collect.py": "031fdc667ae044baea5c94b7b864fec8b23b49548e9a963479982e06dac6d1f8",
+    "scripts/physical.sh": "1a3940da445d6a302c2d2a539bad6661a101289a983b7af2aeaa56508bd983bd",
+    "scripts/preflight.sh": "c94f2e020df228bc28cab886b5ca5651153d73299a472ea17214d5d52a2967a0",
+    "scripts/simulate.sh": "a29824e27c1fb64a8b471f9f20441510aebfe475d5350e51afb86af53a60b9c4",
+    "scripts/verify_artifacts.py": "f0baed4fcf53d09ef7b9cef32efb73f3503ecfbb61b2ea4f9c0ec432fc13be44",
+    "tests/tb_gcd.sv": "3ecf0e4e9b840d1185feae9e5c6a87c68d34702b7208c82d52c2408eac5c892f"
+  },
+  "authoritative_run1_zip_sha256": "9caa14593d6c9db005db2807d8fddd7558c183ccbdc2b9f9faedf4cd1f4481d5",
+  "source_run_id": 37756530984,
+  "files": [
+    {
+      "path": "diagnostics/cap_stream.py",
+      "bytes": 526,
+      "sha256": "0cb12c448a9691651d96e8451530b09eb86c6ce2ea6ea757a456a29e41b714fc",
+      "role": "execution_hook"
+    },
+    {
+      "path": "diagnostics/check_cpu.py",
+      "bytes": 1364,
+      "sha256": "68321f90cb8ab039e161c1bcdeca60613d47fdc9babe7c160a00cef77894f7bc",
+      "role": "execution_hook"
+    },
+    {
+      "path": "diagnostics/effective.mk",
+      "bytes": 253,
+      "sha256": "8723e2ef7b132dd1fb77b79db96a22e5f8c30bc1e94e83dc760c2a796b4e3749",
+      "role": "execution_hook"
+    },
+    {
+      "path": "diagnostics/exec_hook.tcl",
+      "bytes": 1450,
+      "sha256": "2da6cc7f6fd58aba96fbbb930af2938a972f478b7409fba088177b31161e9718",
+      "role": "execution_hook"
+    },
+    {
+      "path": "diagnostics/fetch_run1.py",
+      "bytes": 1629,
+      "sha256": "9703b5de5add5e924719fa4376bf3666acd69c5cda44c899ebe0eed348edc7bf",
+      "role": "execution_hook"
+    },
+    {
+      "path": "diagnostics/observe.py",
+      "bytes": 5597,
+      "sha256": "19c0f6b7d8bf64be9e9f214645b54d7b287904c3e5ab0eb0d836edf9291ad1f2",
+      "role": "execution_hook"
+    },
+    {
+      "path": "diagnostics/prepare.py",
+      "bytes": 4944,
+      "sha256": "7a85189ddd1c0c86484166e55531aa6ebe1b436a7de172829ae2f627b86b4a5f",
+      "role": "execution_hook"
+    },
+    {
+      "path": "diagnostics/replay.tcl",
+      "bytes": 479,
+      "sha256": "9eadfa3905ac275fc3ad932c5662e73a4202d75f1707f5e5c1c3d7f4d2c356b4",
+      "role": "execution_hook"
+    },
+    {
+      "path": "diagnostics/run_replay.sh",
+      "bytes": 1926,
+      "sha256": "69630d7b64637005df35340251b1c316eb1d04757e1d7ec56544ccc5973838d5",
+      "role": "execution_hook"
+    },
+    {
+      "path": "diagnostics/seal.py",
+      "bytes": 1486,
+      "sha256": "cdd755a63ffb4fbbf2799477ee31868d35cec340da10d81ba89c4bfdda80a0f7",
+      "role": "execution_hook"
+    },
+    {
+      "path": ".github/workflows/cts_lec_diagnostic.yml",
+      "bytes": 3462,
+      "sha256": "192f9df05c626afd026d14d8358e1da62c97da0961c575f193c0abe1814565e7",
+      "role": "workflow"
+    },
+    {
+      "path": "tests/test_diagnostics.py",
+      "bytes": 7310,
+      "sha256": "8fcb7bcafb098c943584969acdc5e0416154bd0d1fc05f23a47cbb2153ffb93c",
+      "role": "unit_test"
+    },
+    {
+      "path": "DIAGNOSTIC_PATCH_REPORT.md",
+      "bytes": 3762,
+      "sha256": "f6daed12980e072d1fb6e5b24b934e084603029b7f239c76ece2c95c2968a604",
+      "role": "audit_document"
+    },
+    {
+      "path": "DIAGNOSTIC_EXECUTION_PLAN.md",
+      "bytes": 7839,
+      "sha256": "9fc4d1ce9065622b2c830b5e7a335945c367fae1b190514ce13429ca8df8a1cb",
+      "role": "audit_document"
+    }
+  ],
+  "self_excluded": true,
+  "acceptance": {
+    "YAML": "PASS",
+    "ACTIONLINT": "PASS",
+    "BASH_SYNTAX_BLOCKS": 6,
+    "PYTHON_AST_FILES": 7,
+    "UNIT_TESTS_PASSED": 11,
+    "UNIT_TESTS_SKIPPED": 1,
+    "LINUX_SIGNAL_CONTAINER_INTEGRATION": "NOT_RUN",
+    "OLD_TRACKED_FILES": "UNCHANGED",
+    "STAGING": "UNCHANGED",
+    "EXPERIMENT_INPUT_IDENTITY": "PASS",
+    "DIAGNOSTIC_STATIC_GATE": "PASS_OFFLINE"
+  },
+  "ROOT_CAUSE_STATUS": "PARTIALLY_LOCALIZED_HOLD",
+  "AVX512_HYPOTHESIS": "UNPROVEN_HOLD",
+  "CLOUD_BASELINE_RUN1": "FAIL",
+  "CLOUD_BASELINE_RUN2": "NOT_RUN"
+}

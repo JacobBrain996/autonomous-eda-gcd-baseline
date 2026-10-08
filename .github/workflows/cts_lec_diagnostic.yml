@@ -1,0 +1,77 @@
+name: CTS LEC diagnostic only
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: cts-lec-diagnostic
+  cancel-in-progress: false
+jobs:
+  lec-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      ORFS_COMMIT: 3a964e13f11a4e435aac01ffa14db0a7d2853720
+      ORFS_IMAGE: openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Resource preflight
+        run: |
+          mkdir -p evidence/environment evidence/cts-lec-diagnostic
+          bash scripts/preflight.sh before
+      - name: Restore authoritative public Run 1 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 diagnostics/fetch_run1.py
+          python3 diagnostics/check_cpu.py
+      - name: Frozen source and image
+        run: |
+          set -euo pipefail
+          git init orfs
+          git -C orfs remote add origin https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git
+          git -C orfs fetch --depth=1 origin "$ORFS_COMMIT"
+          git -C orfs checkout --detach FETCH_HEAD
+          test "$(git -C orfs rev-parse HEAD)" = "$ORFS_COMMIT"
+          python3 scripts/check_inputs.py --rtl orfs/flow/designs/src/gcd/gcd.v
+          bash scripts/preflight.sh before-pull
+          docker pull "$ORFS_IMAGE"
+          docker image inspect "$ORFS_IMAGE" > evidence/cts-lec-diagnostic/image-inspect.json
+          python3 -c "import json,os; x=json.load(open('evidence/cts-lec-diagnostic/image-inspect.json'))[0]; assert x['Architecture']=='amd64' and x['Os']=='linux' and os.environ['ORFS_IMAGE'] in x['RepoDigests']"
+          bash scripts/preflight.sh after
+      - name: Local LEC replay with preserved failure
+        run: timeout 300 bash diagnostics/run_replay.sh
+      - name: Enforce artifact size and hash allowlist
+        id: seal
+        if: always()
+        run: python3 diagnostics/seal.py
+      - name: Upload diagnostic evidence only
+        if: always() && steps.seal.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cts-lec-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            evidence/cts-lec-diagnostic/output/
+            evidence/cts-lec-diagnostic/container.log
+            evidence/cts-lec-diagnostic/container.size.json
+            evidence/cts-lec-diagnostic/container-return-code.txt
+            evidence/cts-lec-diagnostic/image-inspect.json
+            evidence/cts-lec-diagnostic/artifact-source.json
+            evidence/cts-lec-diagnostic/cpu-comparison.json
+            evidence/cts-lec-diagnostic/diagnostic-artifact-manifest.json
+            evidence/environment/
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
+      - name: Preserve small budget failure report
+        if: always() && steps.seal.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cts-lec-diagnostic-budget-hold-${{ github.run_id }}
+          path: evidence/cts-lec-diagnostic/diagnostic-artifact-manifest.json
+          retention-days: 1
+          if-no-files-found: error
