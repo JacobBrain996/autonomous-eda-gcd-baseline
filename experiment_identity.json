@@ -1,0 +1,9 @@
+{
+  "project": "AUTONOMOUS_EDA_PROTOTYPE_EXPLORATION_V1",
+  "orfs_commit": "3a964e13f11a4e435aac01ffa14db0a7d2853720",
+  "orfs_image": "openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9",
+  "design": "gcd",
+  "platform": "nangate45",
+  "testbench_sha256": "3ecf0e4e9b840d1185feae9e5c6a87c68d34702b7208c82d52c2408eac5c892f",
+  "rtl_sha256": "5009f224876d39e5e77e59ee1528cb0d2a03697251f0971b77cf3e8b0426dd3e"
+}
