@@ -22,6 +22,13 @@ def main():
         p=diag/name
         if p.is_file():files.append(p)
     data=inventory(sorted(files),root)
+    cpu_path=diag/"cpu-comparison.json"
+    cpu=json.loads(cpu_path.read_text()) if cpu_path.is_file() else {}
+    data.update(diagnostic_id="D1B_CPU_GROUPED_LEC_REPLAY",
+                diagnostic_arm=cpu.get("diagnostic_arm","HOLD"),
+                cpu_identity_path="cts-lec-diagnostic/cpu-comparison.json",
+                tool_identity_paths=["cts-lec-diagnostic/output/hooks.json","cts-lec-diagnostic/output/process.json"],
+                identical_execution_environment=False)
     data.update(scope="CTS_POST_REPAIR_LEC_REPLAY_ONLY",AVX512_HYPOTHESIS="UNPROVEN_HOLD",
                 CLOUD_BASELINE_RUN1="FAIL",CLOUD_BASELINE_RUN2="NOT_RUN")
     diag.mkdir(parents=True,exist_ok=True)

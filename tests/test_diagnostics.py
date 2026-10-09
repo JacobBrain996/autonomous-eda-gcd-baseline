@@ -59,10 +59,11 @@ class DiagnosticTests(unittest.TestCase):
     def test_cpu_isa_gate(self):
         sys.path.insert(0,str(ROOT/"diagnostics"))
         import check_cpu
-        base="Model name: AMD EPYC 7763\nFlags: avx avx2 fma xsave\n"
+        base="Architecture: x86_64\nModel name: AMD EPYC 7763\nFlags: avx avx2 fma xsave\n"
         self.assertTrue(check_cpu.analyze(base,base)["ISA_DIAGNOSTIC_GATE"].startswith("PASS"))
         changed=base.replace("xsave","xsave avx512f")
-        self.assertEqual(check_cpu.analyze(base,changed)["ISA_DIAGNOSTIC_GATE"],"HOLD_CPU_CHANGED")
+        self.assertTrue(check_cpu.analyze(base,changed)["ISA_DIAGNOSTIC_GATE"].startswith("PASS"))
+        self.assertEqual(check_cpu.analyze(base,changed)["diagnostic_arm"],"WITH_AVX512")
 
     def test_artifact_budget(self):
         sys.path.insert(0,str(ROOT/"diagnostics"))

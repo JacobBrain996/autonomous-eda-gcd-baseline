@@ -1,0 +1,132 @@
+{
+  "task": "D1B_CPU_CONDITION_GROUPED_DIAGNOSTIC_PREPARATION",
+  "date": "2026-10-09",
+  "base_commit": "f0c29017c705aab3eb6f7ec14716bfe3727eca4b",
+  "files": [
+    {
+      "path": "diagnostics/check_cpu.py",
+      "change": "modify",
+      "before_sha256": "68321f90cb8ab039e161c1bcdeca60613d47fdc9babe7c160a00cef77894f7bc",
+      "sha256": "9fc145624351b5d4601902a4fb84986661f06ac183e49e838469a7f4d5de0d1a",
+      "bytes": 3675
+    },
+    {
+      "path": "diagnostics/seal.py",
+      "change": "modify",
+      "before_sha256": "cdd755a63ffb4fbbf2799477ee31868d35cec340da10d81ba89c4bfdda80a0f7",
+      "sha256": "40881884f6314a465973f5b80cf103f820bc4ccce8ea17244b0c1f0f2527cc0c",
+      "bytes": 1972
+    },
+    {
+      "path": ".github/workflows/cts_lec_diagnostic.yml",
+      "change": "modify",
+      "before_sha256": "192f9df05c626afd026d14d8358e1da62c97da0961c575f193c0abe1814565e7",
+      "sha256": "335742947f2cd9dcda23d0071fe40ce7c8a9eb34ee112b5a0e3e7768bf531a4a",
+      "bytes": 3572
+    },
+    {
+      "path": "tests/test_diagnostics.py",
+      "change": "modify",
+      "before_sha256": "8fcb7bcafb098c943584969acdc5e0416154bd0d1fc05f23a47cbb2153ffb93c",
+      "sha256": "8274756dc6263711f6994a27b932043b25c5f4819b079b546cd3b389ee7dcae4",
+      "bytes": 7421
+    },
+    {
+      "path": "tests/test_d1b_cpu.py",
+      "change": "add",
+      "before_sha256": null,
+      "sha256": "5b859519b96e7dfef82d5df101c3a10aaaf884d52a9e5a8930e9fe7287fcfc3a",
+      "bytes": 3952
+    },
+    {
+      "path": "D1B_EXECUTION_PLAN.md",
+      "change": "add",
+      "before_sha256": null,
+      "sha256": "50f26a1dc6a952dd11a563e49deb9f09d0f58fddc065b9ded8c99135d73f63fb",
+      "bytes": 4316
+    }
+  ],
+  "self_excluded": true,
+  "frozen_experiment": {
+    "project": "AUTONOMOUS_EDA_PROTOTYPE_EXPLORATION_V1",
+    "orfs_commit": "3a964e13f11a4e435aac01ffa14db0a7d2853720",
+    "orfs_image": "openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9",
+    "design": "gcd",
+    "platform": "nangate45",
+    "testbench_sha256": "3ecf0e4e9b840d1185feae9e5c6a87c68d34702b7208c82d52c2408eac5c892f",
+    "rtl_sha256": "5009f224876d39e5e77e59ee1528cb0d2a03697251f0971b77cf3e8b0426dd3e"
+  },
+  "frozen_inputs": [
+    {
+      "path": "flow/designs/src/gcd/gcd.v",
+      "git_blob": "846d2333cbcd58f8d46a834ad13442410d55834c",
+      "sha256": "5009f224876d39e5e77e59ee1528cb0d2a03697251f0971b77cf3e8b0426dd3e"
+    },
+    {
+      "path": "flow/designs/nangate45/gcd/config.mk",
+      "git_blob": "8d77fbe786cd3b53178a7168f8fe76f29c0a65c6",
+      "sha256": "ebc6c7a30ff59c00bdc177b34a59d3c667e0c9698b4c0c4aba73486ea044b737"
+    },
+    {
+      "path": "flow/designs/nangate45/gcd/constraint.sdc",
+      "git_blob": "cb90dd009013a44d6ae93348d3f3b4eca126e0c7",
+      "sha256": "952a1a0a6de30877f585ee924004ce66151ff8325ec77e274fd92d1fdbf36582"
+    },
+    {
+      "path": "flow/designs/nangate45/gcd/grid_strategy-M1-M4-M7.tcl",
+      "git_blob": "124e9a32cc6cbb655fd3ae4f4a61270cdb09aef5",
+      "sha256": "ce05092076f0494e3ec382d48ac1af19f34818a03c7fa06f19d76327da16917e"
+    },
+    {
+      "path": "flow/designs/nangate45/gcd/rules-base.json",
+      "git_blob": "589dd1efdf4bdb5e9fcbed37d9670d67d45d91e9",
+      "sha256": "015239b1b49760cdf7316fe091ab6d54fcdd7a73845ecb660d3e06a00d1e6d5d"
+    },
+    {
+      "path": "flow/platforms/nangate45/config.mk",
+      "git_blob": "0a69b6642edfd69c477f6f5a5344bd0f3194d816",
+      "sha256": "1d8e639ccc138e72b5fe02dc0130e167455aee1c53b5aa3ee50ff442dc47d6cc"
+    }
+  ],
+  "original_13_file_hashes": {
+    ".gitattributes": "eae31c0293db0e3ae366356cfa733ead56930027c8e7f5bed03c62f37f9f7997",
+    ".github/workflows/orfs_gcd_baseline.yml": "a8ba7af576f118abb00dedd7b37fc8ab13a1be636651cda9ae9ef81f19d8a0b4",
+    ".gitignore": "84d77c4d979b0ca705f90594f087289725f2ab73ed95e5b40a3607a2f61e20bd",
+    "README.md": "027646c23c7ba0cbaa74fb0270799c844d2186d3323fecce864df5953a8aee07",
+    "experiment_identity.json": "ceb65db4a0ebd17e4c7d23241729a5ae2b644add01a7f53439699ecdc17794f3",
+    "scripts/check_gds.py": "f6d52eda4684e017f89524b7282069c9f55a2716395a6e4db4eee8785e2de1d8",
+    "scripts/check_inputs.py": "02ede91217b26bc48406d0ee30a4a3ef6a33aae15df706b1cc9c26f92ef8a27b",
+    "scripts/collect.py": "031fdc667ae044baea5c94b7b864fec8b23b49548e9a963479982e06dac6d1f8",
+    "scripts/physical.sh": "1a3940da445d6a302c2d2a539bad6661a101289a983b7af2aeaa56508bd983bd",
+    "scripts/preflight.sh": "c94f2e020df228bc28cab886b5ca5651153d73299a472ea17214d5d52a2967a0",
+    "scripts/simulate.sh": "a29824e27c1fb64a8b471f9f20441510aebfe475d5350e51afb86af53a60b9c4",
+    "scripts/verify_artifacts.py": "f0baed4fcf53d09ef7b9cef32efb73f3503ecfbb61b2ea4f9c0ec432fc13be44",
+    "tests/tb_gcd.sv": "3ecf0e4e9b840d1185feae9e5c6a87c68d34702b7208c82d52c2408eac5c892f"
+  },
+  "historical_D1_manifest_sha256": "e063138048fcd158a383fb7f64ec000dae725dd7d6a7d80a4c2cda997d3b6f60",
+  "evidence": {
+    "run1_zip_sha256": "9caa14593d6c9db005db2807d8fddd7558c183ccbdc2b9f9faedf4cd1f4481d5",
+    "d1_run_id": 37795979593,
+    "d1_artifact_id": 11558521840,
+    "d1_zip_sha256": "6d3b51af17f3b0c694820a2e11f055b1658267994964d9cca8a20f9679e48d36",
+    "D1_internal_payloads_verified": 11,
+    "D1_RESULT": "HOLD_CPU_ISA_MISMATCH",
+    "LEC_execution": "SKIPPED"
+  },
+  "acceptance": {
+    "YAML": "PASS",
+    "ACTIONLINT": "PASS",
+    "BASH": "PASS",
+    "PYTHON_AST": "PASS",
+    "tests_passed": 18,
+    "tests_skipped": 1,
+    "runtime": "NOT_RUN"
+  },
+  "arms": [
+    "NO_AVX512",
+    "WITH_AVX512"
+  ],
+  "job_count_after_authorization": 1,
+  "ROOT_CAUSE_STATUS": "PARTIALLY_LOCALIZED_HOLD",
+  "AVX512_HYPOTHESIS": "UNPROVEN_HOLD"
+}

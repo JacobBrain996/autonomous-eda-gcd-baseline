@@ -1,4 +1,4 @@
-name: CTS LEC diagnostic only
+name: D1B CPU grouped CTS LEC diagnostic only
 on:
   workflow_dispatch:
 permissions:
@@ -15,6 +15,7 @@ jobs:
       ORFS_COMMIT: 3a964e13f11a4e435aac01ffa14db0a7d2853720
       ORFS_IMAGE: openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9
       GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+      DIAGNOSTIC_ID: D1B_CPU_GROUPED_LEC_REPLAY
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -26,6 +27,7 @@ jobs:
       - name: Restore authoritative public Run 1 artifact
         env:
           GH_TOKEN: ${{ github.token }}
+          D1B_RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           python3 diagnostics/fetch_run1.py
           python3 diagnostics/check_cpu.py
@@ -53,7 +55,7 @@ jobs:
         if: always() && steps.seal.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cts-lec-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          name: cts-lec-d1b-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             evidence/cts-lec-diagnostic/output/
             evidence/cts-lec-diagnostic/container.log
@@ -71,7 +73,7 @@ jobs:
         if: always() && steps.seal.outcome == 'failure'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cts-lec-diagnostic-budget-hold-${{ github.run_id }}
+          name: cts-lec-d1b-budget-hold-${{ github.run_id }}
           path: evidence/cts-lec-diagnostic/diagnostic-artifact-manifest.json
           retention-days: 1
           if-no-files-found: error
