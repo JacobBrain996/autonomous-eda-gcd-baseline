@@ -1,0 +1,119 @@
+name: NO_LEC_ENGINEERING_SMOKE_V1
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orfs-gcd-no-lec-smoke
+  cancel-in-progress: false
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ORFS_COMMIT: 3a964e13f11a4e435aac01ffa14db0a7d2853720
+      ORFS_IMAGE: openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+      IVERILOG_PACKAGE: 12.0-2build2
+    steps:
+      - name: Checkout public experiment repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Initialize evidence
+        run: mkdir -p evidence/environment evidence/raw-logs evidence/failure evidence/status evidence/gds
+      - name: Public runner and resource preflight
+        run: bash scripts/preflight.sh before
+      - name: Verify submitted testbench and frozen source
+        run: |
+          set -euo pipefail
+          python3 scripts/check_inputs.py --testbench-only
+          git init orfs
+          git -C orfs remote add origin https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git
+          git -C orfs fetch --depth=1 origin "$ORFS_COMMIT"
+          git -C orfs checkout --detach FETCH_HEAD
+          test "$(git -C orfs rev-parse HEAD)" = "$ORFS_COMMIT"
+          python3 scripts/check_inputs.py --rtl orfs/flow/designs/src/gcd/gcd.v
+          python3 - <<'PY'
+          import hashlib,json,pathlib
+          m=json.loads(pathlib.Path('D1B_FILE_MANIFEST.json').read_text())
+          for f in m['frozen_inputs']:
+              assert hashlib.sha256((pathlib.Path('orfs')/f['path']).read_bytes()).hexdigest()==f['sha256'], f['path']
+          PY
+          git -C orfs rev-parse HEAD > evidence/environment/orfs-head.txt
+      - name: Install independent runner simulation tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update > evidence/raw-logs/simulator-apt-update.log 2>&1
+          sudo apt-get install --no-install-recommends -y "iverilog=$IVERILOG_PACKAGE" > evidence/raw-logs/simulator-apt-install.log 2>&1
+          command -v iverilog
+          command -v vvp
+          dpkg-query -W iverilog > evidence/environment/simulator-package.txt
+          iverilog -V > evidence/environment/iverilog-version.txt 2>&1
+          vvp -V > evidence/environment/vvp-version.txt 2>&1
+      - name: Independent RTL simulation gate
+        run: bash scripts/simulate.sh
+      - name: Disk check immediately before image pull
+        run: bash scripts/preflight.sh before-pull
+      - name: Pull exact container and verify architecture
+        run: |
+          set -euo pipefail
+          docker pull "$ORFS_IMAGE" 2>&1 | tee evidence/raw-logs/docker-pull.log
+          docker image inspect "$ORFS_IMAGE" > evidence/environment/image-inspect.json
+          test "$(docker image inspect --format '{{.Architecture}}' "$ORFS_IMAGE")" = amd64
+          test "$(docker image inspect --format '{{.Os}}' "$ORFS_IMAGE")" = linux
+          python3 -c "import json,os; x=json.load(open('evidence/environment/image-inspect.json'))[0]; assert os.environ['ORFS_IMAGE'] in x['RepoDigests']"
+      - name: Disk and RAM check after image pull
+        run: bash scripts/preflight.sh after
+      - name: Required core tool probes
+        run: |
+          set -euo pipefail
+          rc=0
+          docker run --rm --network none --entrypoint bash "$ORFS_IMAGE" -lc '
+            set -eo pipefail
+            source /OpenROAD-flow-scripts/env.sh
+            set -u
+            /OpenROAD-flow-scripts/tools/install/yosys/bin/yosys -V
+            /OpenROAD-flow-scripts/tools/install/yosys/bin/yosys -Q -T -p "help read_verilog"
+            /OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad -version
+            /OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad -help
+            /usr/bin/klayout -b -v
+            make --version
+          ' > evidence/environment/tool-versions.txt 2>&1 || rc=$?
+          cat evidence/environment/tool-versions.txt
+          printf '%s\n' "$rc" > evidence/status/core-tool-return-code.txt
+          if [ "$rc" -ne 0 ]; then
+            cp evidence/environment/tool-versions.txt evidence/failure/core-tools.log
+            exit "$rc"
+          fi
+      - name: Frozen full physical flow with explicit formal bypass
+        run: bash scripts/smoke_physical.sh
+      - name: Collect and evaluate gates
+        id: collect
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 scripts/smoke_collect.py
+          python3 scripts/verify_artifacts.py evidence --checksums-only
+      - name: Upload evidence including failure reports
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: orfs-gcd-no-lec-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
+      - name: Require engineering gates and successful upload
+        if: always()
+        env:
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+          COLLECT_OUTCOME: ${{ steps.collect.outcome }}
+        run: |
+          set -euo pipefail
+          test "$UPLOAD_OUTCOME" = success
+          test "$COLLECT_OUTCOME" = success
+          python3 -c "import json; g=json.load(open('evidence/gates.json')); print(json.dumps(g,indent=2)); assert all(g[k]=='PASS' for k in ('RTL_SIMULATION_GATE','PHYSICAL_FLOW_GATE','TIMING_GATE','ARTIFACT_GATE'))"
+          echo 'SMOKE_ENGINEERING_GATES=PASS; FORMAL_EQUIVALENCE_GATE=NOT_RUN_DIAGNOSTIC_BYPASS; NOT_A_FORMALLY_VERIFIED_BASELINE'
