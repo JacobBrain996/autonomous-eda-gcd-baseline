@@ -1,5 +1,5 @@
 import importlib.util, pathlib, sys, tempfile, unittest, zipfile, json, hashlib
-ROOT=pathlib.Path('E:/AUTONOMOUS_EDA_V1/workspace/autonomous-eda-gcd-baseline')
+ROOT=pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 
 class VeriEDATests(unittest.TestCase):

@@ -59,3 +59,24 @@ Next implementation order:
 5. Extend beyond GCD only after tool/model/verifier coverage is checked. Measure verified improvement rate, false acceptance, unknown/failure recovery and total tool cost; stratify CPU/tool identity and use repeated independent runs. Whether verification-aware cost allocation offers research value remains a testable hypothesis.
 
 No UI, multi-agent controller, training framework or novel-toolchain rebuild is introduced. The full goal stays active; this checkpoint is an implemented foundation, not a redefinition of the final outcome.
+
+## Verification interfaces checkpoint
+
+Two additional local interfaces now exist:
+
+```powershell
+python -m verieda compare-constraints reference-export.sdc candidate-export.sdc
+python -m verieda observe-formal proof.log --return-code 1
+```
+
+`compare-constraints` does not execute Tcl. Its `exported-sdc-literals.v1` profile covers current_design, explicitly named physical/virtual clocks, period/waveform, propagation, basic network latency, explicit I/O port collections and min/max delays. Numeric values use bounded exact decimals, not float tolerances. It checks definition order and rejects duplicate/ambiguous specifications. Variables, source/exec/eval, wildcards, timing exceptions, unsupported flags and malformed grouping yield UNKNOWN. It does not assume an ideal-to-propagated conversion is automatically permitted.
+
+Exit codes: 0 EQUAL_WITHIN_PROFILE, 1 DIFFERENT, 2 UNKNOWN/input error. Equality is deliberately not complete native SDC equivalence: `full_constraint_gate` remains UNKNOWN until native timing units, dependencies, object inventory and coverage are independently certified. Both raw file hashes and normalized contract hashes are recorded. Equal periods alone never suffice. The original Tcl source is not silently interpreted by a partial evaluator.
+
+`observe-formal` separates basecase counterexample reports, induction bound exhaustion, finite/combinational success, reported unbounded proof, timeout, model/capability gap, unknown SIGKILL cause and tool error. Log markers were checked against the [Yosys SAT source referenced by frozen ORFS](https://github.com/YosysHQ/yosys/blob/a5af9d690a43744bf6b2cc3dea2717c16b54621c/passes/sat/sat.cc). That source reference is not an assertion about the image binary's build provenance. Raw and decoded-text hashes are distinct. No untrusted log can create certified PASS or a validated counterexample verdict; execution identity, exact property, initialization, models and native proof/witness validation are still required. Exit zero means classification completed, never Formal PASS.
+
+Latest validation: 74 tests, 73 passed, one existing Linux native-signal test skipped on Windows. Added regressions cover constraint relaxation, I/O changes, dynamic/unknown Tcl, malformed syntax, numeric precision/range, unresolved/duplicate clocks, propagation changes, actual exported SDC support, formal result distinctions and CLI exit/status behavior. `evidence/verieda-constraint-profile-check.json` was produced by the real CLI against the retained final SDC; it reports equality within the profile and full native constraint gate UNKNOWN. Tests include synthetic logs; these are not real Formal experiments.
+
+The core tests now resolve the repository from their own file path. The legacy unpublished Acceptance preparation still has workspace-bound fixtures and needs separate native integration review before a future CI release. Existing Acceptance code/workflow/report were not changed or published in this checkpoint.
+
+Next integration work remains substantive: native reference/candidate constraint exports with bound context; authenticated Formal results and witness/proof validation; then immutable action/candidate manifests and an independent adoption predicate. Actual optimization, successful formal/timing baselines, multiple designs and fair research comparisons remain unachieved. No new cloud execution authority is inferred from software progress.
