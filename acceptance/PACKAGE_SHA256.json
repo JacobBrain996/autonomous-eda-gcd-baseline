@@ -1,0 +1,21 @@
+{
+  "schema": "verieda.native-acceptance-package.v1",
+  "self_excluded": true,
+  "files": {
+    ".github/workflows/final_netlist_acceptance.yml": "5219380183c2ea90ab464a46ca7945c3538fc0d6df63b0b633d3cd2fc9e37c27",
+    "acceptance/verify.py": "f15fdd18cf188ec028d3574de76a4ff084d38e42ff4cf35a10465bc3823b2e39",
+    "acceptance/run.sh": "f44fa4fab9dddb2c132c814e7c48518175359edf99823aa4cefef8295c4f12ca",
+    "acceptance/sta.tcl": "c1a821baf5257c99e6a8e106c487137b60b2f9eb4527eea0076bd8500dae38ad",
+    "acceptance/snapshot.tcl": "8404db0e9c0b5292a2c614eea4729c5abf30c0652f3a2ffd9188dbe988856cad",
+    "acceptance/miter.v": "6f0f4600f2a8004427e8381d39c246306de54754b5993bbcdd55180c5097d824",
+    "verieda/__init__.py": "a5131213bc9b02b10a9d50568d581abfee1f56a13abcd928563dfd9e34093b28",
+    "verieda/__main__.py": "e3492097fbfe1168d68846e75c4ab2e03670138536575c24460991760560c305",
+    "verieda/constraints.py": "d76eab2cb9a3a0cb4108ef28d02d3253b7247da9eabed03453028e57cab0218f",
+    "verieda/evidence.py": "24b7c0e7e4b12b7ec3479655c0d4868306e86fe1dcc49485448383527e11d777",
+    "verieda/formal.py": "e8710f48c6f589c4299e4b3477fffa6225b0888665e2a1a2d22ba93f4f9b8fa4",
+    "tests/test_acceptance.py": "350425406cbbce67e8cbed47904c234ee9fe74d971dc9fc331dae63a55a58e72",
+    "tests/test_native_bridge.py": "5ad364667705fe1b37c06609c824ff422a7a96e95a840064e7e7b95f261eee97"
+  },
+  "scope": "existing final netlist only; no physical optimization; no baseline promotion",
+  "authorization_boundary": "Integrity manifest only; this file does not authorize push or dispatch."
+}

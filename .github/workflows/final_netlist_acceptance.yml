@@ -1,0 +1,104 @@
+name: Existing netlist STA Formal evidence - no baseline promotion
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: final-netlist-acceptance
+  cancel-in-progress: false
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ORFS_COMMIT: 3a964e13f11a4e435aac01ffa14db0a7d2853720
+      ORFS_IMAGE: openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Public hosted runner preflight
+        env:
+          HOSTED_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = JacobBrain996/autonomous-eda-gcd-baseline
+          test "$HOSTED_ENVIRONMENT" = github-hosted
+          test "$RUNNER_OS" = Linux
+          test "$RUNNER_ARCH" = X64
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          python3 acceptance/verify.py package-check
+          command -v gh
+          mkdir -p evidence/final-acceptance/output evidence/environment
+          bash scripts/preflight.sh before
+          python3 - <<'PY'
+          import json,os,pathlib
+          json.dump({k:os.environ[k] for k in ('GITHUB_REPOSITORY','GITHUB_RUN_ID','GITHUB_SHA','GITHUB_RUN_ATTEMPT','RUNNER_OS','RUNNER_ARCH')},pathlib.Path('evidence/final-acceptance/execution-source.json').open('w'),indent=2)
+          PY
+      - name: Restore only authoritative Smoke inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 acceptance/verify.py fetch
+      - name: Prepare frozen source and pinned image
+        run: |
+          set -euo pipefail
+          git init orfs
+          git -C orfs remote add origin https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git
+          git -C orfs fetch --depth=1 origin "$ORFS_COMMIT"
+          git -C orfs checkout --detach FETCH_HEAD
+          test "$(git -C orfs rev-parse HEAD)" = "$ORFS_COMMIT"
+          git -C orfs rev-parse HEAD > evidence/final-acceptance/orfs-head.txt
+          bash scripts/preflight.sh before-pull
+          docker pull "$ORFS_IMAGE" > evidence/final-acceptance/pull.log 2>&1
+          docker image inspect "$ORFS_IMAGE" > evidence/final-acceptance/image-inspect.json
+          python3 -c "import json,os; m=json.load(open('evidence/final-acceptance/image-inspect.json'))[0]; assert m['Architecture']=='amd64' and m['Os']=='linux' and os.environ['ORFS_IMAGE'] in m['RepoDigests']"
+          bash scripts/preflight.sh after
+      - name: Read-only final STA and complete sequential proof only
+        run: |
+          set -euo pipefail
+          name="final-acceptance-$GITHUB_RUN_ID"
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          rc=0
+          timeout --kill-after=5 420 docker run --rm --name "$name" --network none --read-only --workdir /work \
+            --cpus 2 --memory 6g --pids-limit 128 --cap-drop ALL --security-opt no-new-privileges \
+            --ulimit core=0 --ulimit fsize=16777216 --user "$(id -u):$(id -g)" \
+            --tmpfs /tmp:rw,size=67108864 --entrypoint bash \
+            -v "$GITHUB_WORKSPACE/acceptance:/audit:ro" -v "$GITHUB_WORKSPACE/verieda:/verieda:ro" -v "$GITHUB_WORKSPACE/orfs:/frozen:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/final-acceptance/inputs:/inputs:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/final-acceptance/output:/work" \
+            "$ORFS_IMAGE" /audit/run.sh > evidence/final-acceptance/container.log 2>&1 || rc=$?
+          printf '%s\n' "$rc" > evidence/final-acceptance/container-return-code.txt
+          exit "$rc"
+      - name: Seal public reports and identities
+        if: always()
+        id: seal
+        run: |
+          set -euo pipefail
+          if python3 acceptance/verify.py seal evidence && python3 scripts/verify_artifacts.py evidence --checksums-only; then
+            exit 0
+          fi
+          python3 - <<'PY'
+          import json,pathlib
+          p=pathlib.Path('evidence/final-acceptance/hold-seal.json')
+          p.parent.mkdir(parents=True,exist_ok=True)
+          p.write_text(json.dumps({'status':'UNKNOWN_HOLD','reason':'seal/dependency failure; see original job logs'}))
+          PY
+          exit 1
+      - name: Upload bounded acceptance evidence
+        if: always() && steps.seal.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: final-netlist-acceptance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload seal HOLD only
+        if: always() && steps.seal.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: final-netlist-acceptance-hold-${{ github.run_id }}
+          path: evidence/final-acceptance/hold-seal.json
+          if-no-files-found: error
+          retention-days: 7
