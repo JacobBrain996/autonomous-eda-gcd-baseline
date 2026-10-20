@@ -14,7 +14,8 @@
     "verieda/evidence.py": "24b7c0e7e4b12b7ec3479655c0d4868306e86fe1dcc49485448383527e11d777",
     "verieda/formal.py": "e8710f48c6f589c4299e4b3477fffa6225b0888665e2a1a2d22ba93f4f9b8fa4",
     "tests/test_acceptance.py": "350425406cbbce67e8cbed47904c234ee9fe74d971dc9fc331dae63a55a58e72",
-    "tests/test_native_bridge.py": "5ad364667705fe1b37c06609c824ff422a7a96e95a840064e7e7b95f261eee97"
+    "tests/test_native_bridge.py": "5ad364667705fe1b37c06609c824ff422a7a96e95a840064e7e7b95f261eee97",
+    "acceptance/.gitattributes": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9"
   },
   "scope": "existing final netlist only; no physical optimization; no baseline promotion",
   "authorization_boundary": "Integrity manifest only; this file does not authorize push or dispatch."

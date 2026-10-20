@@ -34,3 +34,5 @@ Python AST、嵌入Python、YAML/actionlint、完整Bash段和Tcl语法均离线
 本轮只做本地提交，不push、不dispatch。准备中的变更仅公开软件、测试、workflow和说明；原ZIP及其他科研目录不进入提交。包内软件SHA清单self-excluded；它证明一致性，不授予执行权限，实际运行commit/run另由GitHub记录。
 
 用户Goal明确“原Final Netlist Acceptance的云端运行尚未获得新授权”。因此接下来需要用户明确批准：正常推送这批可审阅的公开代码，然后只触发上述作业一次，并回收证据。没有批准前继续保持LOCAL_ONLY / NATIVE_RUN=NOT_RUN。
+
+Native verifier source uses acceptance/.gitattributes to pin LF within that directory; this prevents Windows checkout conversion from invalidating source SHA bindings. The original root attributes and frozen experiment files are unchanged.
