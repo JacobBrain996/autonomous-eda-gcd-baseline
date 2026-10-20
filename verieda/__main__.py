@@ -3,6 +3,7 @@ from pathlib import Path
 from .evidence import inspect
 from .constraints import compare_sdc
 from .formal import observe_yosys
+from .native import inspect_acceptance
 
 def read(path,limit):
     p=Path(path)
@@ -16,6 +17,8 @@ def main():
     p=sub.add_parser('inspect',help='independently audit an ORFS artifact ZIP or directory')
     p.add_argument('artifact');p.add_argument('--expect',help='external experiment_identity.json')
     p.add_argument('--expected-sha256',help='trusted SHA256 of the original ZIP')
+    p=sub.add_parser('inspect-acceptance',help='audit native acceptance bundle; no proof promotion')
+    p.add_argument('artifact');p.add_argument('--expected-sha256')
     p=sub.add_parser('compare-constraints',help='strict exported-SDC literal profile; never executes Tcl')
     p.add_argument('reference');p.add_argument('candidate')
     p=sub.add_parser('observe-formal',help='classify a log; does not certify proof or witness')
@@ -24,6 +27,9 @@ def main():
     try:
         if args.command=='inspect':
             state=inspect(args.artifact,args.expect,args.expected_sha256)
+            rc=2 if state['gates']['evidence']=='FAIL' else 0
+        elif args.command=='inspect-acceptance':
+            state=inspect_acceptance(args.artifact,args.expected_sha256)
             rc=2 if state['gates']['evidence']=='FAIL' else 0
         elif args.command=='compare-constraints':
             a,at=read(args.reference,4*1024*1024);b,bt=read(args.candidate,4*1024*1024)

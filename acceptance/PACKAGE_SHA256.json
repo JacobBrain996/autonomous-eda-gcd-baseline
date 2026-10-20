@@ -9,13 +9,15 @@
     "acceptance/snapshot.tcl": "8404db0e9c0b5292a2c614eea4729c5abf30c0652f3a2ffd9188dbe988856cad",
     "acceptance/miter.v": "6f0f4600f2a8004427e8381d39c246306de54754b5993bbcdd55180c5097d824",
     "verieda/__init__.py": "a5131213bc9b02b10a9d50568d581abfee1f56a13abcd928563dfd9e34093b28",
-    "verieda/__main__.py": "e3492097fbfe1168d68846e75c4ab2e03670138536575c24460991760560c305",
+    "verieda/__main__.py": "bb2e3b5ba9b7662cc3fb2ff66b58666917a684ad670891e3d8c6c97c94d6a75c",
     "verieda/constraints.py": "d76eab2cb9a3a0cb4108ef28d02d3253b7247da9eabed03453028e57cab0218f",
     "verieda/evidence.py": "24b7c0e7e4b12b7ec3479655c0d4868306e86fe1dcc49485448383527e11d777",
     "verieda/formal.py": "e8710f48c6f589c4299e4b3477fffa6225b0888665e2a1a2d22ba93f4f9b8fa4",
     "tests/test_acceptance.py": "350425406cbbce67e8cbed47904c234ee9fe74d971dc9fc331dae63a55a58e72",
     "tests/test_native_bridge.py": "5ad364667705fe1b37c06609c824ff422a7a96e95a840064e7e7b95f261eee97",
-    "acceptance/.gitattributes": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9"
+    "acceptance/.gitattributes": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9",
+    "verieda/native.py": "1e7bba58bb7d3394e3e3670526c7c41de1ef1c214a067ff0f4b1f07d769419f7",
+    "tests/test_native_evidence.py": "727503f08ea0028f0ff5ec1b1529143bf3b27444cf5620496ebb84b6a3c7db5c"
   },
   "scope": "existing final netlist only; no physical optimization; no baseline promotion",
   "authorization_boundary": "Integrity manifest only; this file does not authorize push or dispatch."
