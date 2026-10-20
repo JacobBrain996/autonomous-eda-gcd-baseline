@@ -13,6 +13,14 @@
 5. Formal阶段总预算300秒，首先探测所有使用的Yosys命令/选项，再做完整功能模型、时钟、blackbox/latch和全输出范围检查，执行basecase+无界归纳。两次共同reset后所有18位输出始终比较；数据寄存器不初始化为0，未来输入和reset自由。失败时dump WaveJSON；只有basecase反例标记加包含mismatch=1的witness才记录FAIL_COUNTEREXAMPLE。达到归纳长度上限不是反例。超时/模型缺失/工具错误分别记录。
 6. 容器总上限420秒，2CPU/6GiB、只读根与输入、network none、core=0、单文件16MiB、总证据128MiB。记录工具版本/二进制、源/库、输入、VeriEDA代码、hook、证明脚本、witness、快照、SPEF、报告及结果SHA256；保留原始错误和退出码。seal依赖失败也生成一个最小HOLD报告，job不转绿。
 
+## Reset-contract source audit
+
+Frozen RTL was fetched read-only from the exact ORFS commit and checked against SHA256 `5009f224876d39e5e77e59ee1528cb0d2a03697251f0971b77cf3e8b0426dd3e`. Source: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/blob/3a964e13f11a4e435aac01ffa14db0a7d2853720/flow/designs/src/gcd/gcd.v . This is source analysis, not a new simulation or Formal run.
+
+The datapath RegEn does not directly reset (lines 571-578), but the controller synchronous reset sets state to IDLE (lines 143, 352-358). In IDLE, both register enables are one and both muxes select request data independently of req_val (lines 279-285). Thus after reset edge 1 the controller is IDLE; at reset edge 2 the two data banks load common defined request bits. This explains why the existing boot==2 observation boundary need not force data initialization to zero or mask outputs when resp_val is low. resp_msg is the subtractor output (lines 535-538), so idle output data remains observable in the miter.
+
+The claim is limited to the frozen RTL. Corresponding gate-state reset/recoding, Liberty semantics and all-output equivalence still require the actual native proof. No gate equivalence, induction convergence or arbitrary-unreset-state equivalence follows from this source inspection. A solver counterexample must be inspected against this exact two-edge contract, not automatically interpreted as a physical implementation bug.
+
 ## 判据与限制
 
 - Formal仅真正无界归纳成功且全部前置检查通过才为PASS_RESET_CONTRACT_UNBOUNDED；有限BMC或未经身份/范围验证的日志不能PASS。
