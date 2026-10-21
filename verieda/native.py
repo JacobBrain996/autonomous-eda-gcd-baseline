@@ -11,6 +11,34 @@ from .formal import observe_yosys
 PREFIX='final-acceptance/'
 OUTPUT=PREFIX+'output/'
 
+def _validation_coverage(data):
+    """Describe actual importer limits; file presence is never certification.
+
+    An empty check_setup report can mean no emitted warnings. It is not an
+    inventory of checked objects, clocks, exceptions or unconstrained endpoints.
+    Names for future hold/coverage evidence deliberately grant no parser support.
+    """
+    name=OUTPUT+'sta/coverage.rpt';raw=data.get(name)
+    report={'path':name,'status':'NOT_AVAILABLE','bytes':None,'sha256':None}
+    if raw is not None:
+        report.update(status='PRESENT_UNINTERPRETED' if raw.strip() else 'EMPTY_NOT_A_CERTIFICATE',
+                      bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
+    return {'schema':'verieda.validation-coverage.v1','coverage_report':report,
+            'checker_capabilities':{'setup_wns_tns':'IMPLEMENTED_OBSERVATION_ONLY',
+                                    'independent_hold':'NOT_IMPLEMENTED',
+                                    'constraint_coverage_certification':'NOT_IMPLEMENTED',
+                                    'raw_formal_result':'OBSERVATION_ONLY_NOT_CERTIFIED'},
+            'required_observations':['independent_min_delay_paths_and_wns_tns',
+                                     'native_clock_and_endpoint_inventory',
+                                     'unconstrained_objects_and_exceptions_inventory',
+                                     'original_to_final_constraint_semantics'],
+            'coverage_gate':'UNKNOWN','independent_hold_gate':'UNKNOWN',
+            'can_certify_full_final_acceptance':False,
+            'next_local_action':'implement and test missing validators before claiming complete native acceptance',
+            'scope':'capabilities of this native bundle importer, not all VeriEDA modules; no timing/frozen-input/Goal mutation',
+            'execution_authorized':False}
+
+
 def inspect_acceptance(path,expected_archive_sha=None):
     state={'schema':'verieda.native-observations.v1',
            'gates':{k:'UNKNOWN' for k in ('evidence','identity','timing','formal','constraints')},
@@ -29,6 +57,7 @@ def inspect_acceptance(path,expected_archive_sha=None):
         data=read_bundle(path);verify_bundle(data)
         state['gates']['evidence']='PASS'
         state['evidence']={'files':len(data),'trust':'EXPECTED_ARCHIVE_SHA256' if expected_archive_sha else 'CHECKSUM_CONSISTENCY_ONLY'}
+        state['validation_coverage']=_validation_coverage(data)
     except (ValueError,KeyError,TypeError,OSError,UnicodeError,zipfile.BadZipFile) as ex:
         state['gates']['evidence']='FAIL';state['acceptance']='EVIDENCE_INVALID'
         issue('EVIDENCE_INVALID',str(ex));return state

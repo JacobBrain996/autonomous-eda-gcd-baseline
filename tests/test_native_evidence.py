@@ -33,6 +33,27 @@ class NativeEvidenceTests(unittest.TestCase):
             self.assertEqual(s['formal_observation']['observation'],'UNBOUNDED_PROOF_REPORTED')
             self.assertEqual(s['acceptance'],'NOT_ACCEPTED')
             self.assertIn('SUMMARY_CONTRADICTION',[x['kind'] for x in s['issues']])
+    def test_real_final_bundle_exposes_missing_checker_capabilities_and_empty_coverage(self):
+        from test_case import NATIVE
+        s=self.inspect(NATIVE,expected_archive_sha='58b83ba6a4253323b5f3768197c1b7e832bbe5faebc09c3f8071d46b25fc6566')
+        r=s['validation_coverage']
+        self.assertEqual(r['coverage_report']['status'],'EMPTY_NOT_A_CERTIFICATE')
+        self.assertEqual(r['coverage_report']['bytes'],0)
+        self.assertEqual(r['checker_capabilities']['independent_hold'],'NOT_IMPLEMENTED')
+        self.assertEqual(r['checker_capabilities']['constraint_coverage_certification'],'NOT_IMPLEMENTED')
+        self.assertFalse(r['can_certify_full_final_acceptance'])
+        self.assertEqual(r['coverage_gate'],'UNKNOWN');self.assertEqual(s['gates']['timing'],'FAIL')
+        self.assertIn('original_to_final_constraint_semantics',r['required_observations'])
+    def test_nonempty_or_success_claimed_coverage_does_not_implement_missing_checker(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=pathlib.Path(d);self.fixture(p,{
+                'final-acceptance/output/sta/coverage.rpt':'All checks PASS. All ports constrained.',
+                'final-acceptance/output/sta/hold.rpt':'wns min 0',
+                'final-acceptance/output/sta/constraint-inventory.json':'{"coverage_gate":"PASS"}'})
+            r=self.inspect(p)['validation_coverage']
+            self.assertEqual(r['coverage_report']['status'],'PRESENT_UNINTERPRETED')
+            self.assertEqual(r['coverage_gate'],'UNKNOWN')
+            self.assertFalse(r['can_certify_full_final_acceptance'])
     def test_changed_payload_fails_integrity_before_observations(self):
         with tempfile.TemporaryDirectory() as d:
             p=pathlib.Path(d);self.fixture(p);(p/'final-acceptance/output/sta/wns.rpt').write_text('wns max 1')

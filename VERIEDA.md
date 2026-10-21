@@ -2,6 +2,13 @@
 
 ## V0 software checkpoint — 2026-10-21 (supersedes historical status below)
 
+Current boundary: the executable planning/recovery core is not yet a complete
+verified autonomous optimization loop. The native acceptance importer does not
+implement independent hold or full constraint-coverage certification; loaded real
+cases therefore retain those unknowns. Synthetic accept/reject tests exercise the
+predicate, not a completed real candidate adoption. The project Goal remains
+unfinished independently of the particular GCD candidate's blocked proof.
+
 ### Isolated action adapter
 
 #### Results and feedback
@@ -302,3 +309,21 @@ Local checkpoint: 243 tests, 242 passed and one Linux integration skipped.
 Package hashes, Python syntax, real CLI output and diff checks passed. The pending
 publication/one-run authorization still names b19cc94; this increment is local
 and is not implicitly included in that approval request.
+
+
+## Native acceptance coverage diagnostics
+
+`inspect-acceptance` now includes `validation_coverage`, listing implemented
+observers versus missing checkers, report presence/size/SHA256 and the missing
+native min-delay, clock/endpoint inventory, exceptions/unconstrained objects and
+original-to-final SDC semantics obligations. It does not change the imported case
+identity, prior proof scope or gates. The real Run 39544704950 coverage.rpt is
+zero bytes. This can mean no check_setup warnings were emitted; it is not a
+complete coverage inventory or a certificate. Even a nonempty report claiming
+PASS cannot implement the absent checker or certify final acceptance.
+
+This is a capability audit of the native importer, not a global execution or
+Goal status. Local checkpoint: 245 tests, 244 passed and one Linux integration
+skipped; existing state/candidate binding tests still pass. No native hold result,
+coverage PASS, public push or new cloud job was created. Publication authorization
+pending for b19cc94 still excludes subsequent local commits.
