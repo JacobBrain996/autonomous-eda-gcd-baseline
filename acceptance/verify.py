@@ -47,7 +47,7 @@ def restore(archive,out):
 def package_check(root=Path(__file__).resolve().parents[1]):
     root=Path(root).resolve()
     m=json.loads((root/'acceptance/PACKAGE_SHA256.json').read_text())
-    if m.get('schema')!='verieda.native-acceptance-package.v1' or not isinstance(m.get('files'),dict) or not 1<=len(m['files'])<=64:raise ValueError('HOLD package manifest schema')
+    if m.get('schema')!='verieda.native-acceptance-package.v1' or not isinstance(m.get('files'),dict) or not 1<=len(m['files'])<=80:raise ValueError('HOLD package manifest schema')
     for name,h in m['files'].items():
         safe_name(name);p=root/name
         if p.is_symlink() or not p.resolve().is_relative_to(root) or not p.is_file() or not re.fullmatch('[0-9a-f]{64}',h) or sha(p)!=h:raise ValueError('HOLD package missing/changed: '+name)

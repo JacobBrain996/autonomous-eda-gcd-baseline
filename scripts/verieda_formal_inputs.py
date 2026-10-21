@@ -33,6 +33,22 @@ def restore(raw,output):
  record={**EXPECTED,'artifact_id':PIN['id'],'inner_sha256':INNER_SHA,'candidate_id':CANDIDATE,'subject_id':manifest['subject_id'],'task_id':manifest['task_id']}
  (out/'restore.json').write_bytes((json.dumps(record,indent=2)+'\n').encode());return record
 
+def restore_reviewed_proof(raw,output):
+ """Exact reviewed public result, never arbitrary producer-supplied PASS."""
+ review=json.loads((pathlib.Path(__file__).resolve().parents[1]/'cases/gcd-speed.formal-review.json').read_text())
+ pin=review['execution'];out=_unlinked(output)
+ if out.exists() or len(raw)!=pin['artifact_bytes'] or hashlib.sha256(raw).hexdigest()!=pin['outer_sha256']:raise ValueError('reviewed proof archive changed/output exists')
+ with zipfile.ZipFile(io.BytesIO(raw)) as z:
+  items=z.infolist();names=[name_ok(i.filename) for i in items]
+  if len(names)!=len(set(names)) or len(names)>200 or sum(i.file_size for i in items)>64*1024*1024 or any(stat.S_ISLNK(i.external_attr>>16) or i.file_size>32*1024*1024 for i in items):raise ValueError('bounded proof ZIP required')
+  hits=[n for n in names if n.endswith('/verifier-result.zip') or n=='verifier-result.zip']
+  if len(hits)!=1:raise ValueError('unambiguous inner proof required')
+  inner=z.read(hits[0])
+ if hashlib.sha256(inner).hexdigest()!=review['archive_sha256']:raise ValueError('reviewed inner proof changed')
+ out.parent.mkdir(parents=True,exist_ok=True)
+ with out.open('xb') as stream:stream.write(inner)
+ return {'archive_sha256':review['archive_sha256'],'execution':pin}
+
 if __name__=='__main__':
  if os.environ.get('GITHUB_REPOSITORY')!=REPO:raise SystemExit('HOLD repository context')
  endpoint='actions/artifacts/'+str(PIN['id']);meta=gh_api(endpoint)

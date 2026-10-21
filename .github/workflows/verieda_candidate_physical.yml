@@ -1,0 +1,174 @@
+name: VeriEDA candidate physical comparison - explicit approval required
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_id:
+        description: Explicitly approved immutable candidate ID
+        required: true
+        type: string
+      approve_internal_lec_bypass:
+        description: Approve engineering-only internal LEC/SEC bypass; fresh final Formal remains mandatory
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: verieda-candidate-physical
+  cancel-in-progress: false
+jobs:
+  physical:
+    if: github.repository == 'JacobBrain996/autonomous-eda-gcd-baseline' && github.event.repository.visibility == 'public'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ORFS_COMMIT: 3a964e13f11a4e435aac01ffa14db0a7d2853720
+      ORFS_IMAGE: openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+      APPROVED_CANDIDATE_ID: ${{ inputs.candidate_id }}
+      APPROVE_INTERNAL_LEC_BYPASS: ${{ inputs.approve_internal_lec_bypass }}
+      WORKFLOW_SHA: ${{ github.workflow_sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Admission and restore exact public synthesis candidate
+        env:
+          HOSTED_ENVIRONMENT: ${{ runner.environment }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/physical-job/artifact evidence/physical-job/native
+          test "$APPROVE_INTERNAL_LEC_BYPASS" = true
+          test "$HOSTED_ENVIRONMENT" = github-hosted
+          test "$RUNNER_OS/$RUNNER_ARCH" = Linux/X64
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          test "$GITHUB_SHA" = "$WORKFLOW_SHA"
+          python3 acceptance/verify.py package-check
+          python3 - <<'PY'
+          import json,os,pathlib,subprocess
+          from scripts.verieda_formal_inputs import CANDIDATE
+          assert os.environ['APPROVED_CANDIDATE_ID']==CANDIDATE
+          endpoint='repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/workflows/verieda_candidate_physical.yml/runs?head_sha='+os.environ['GITHUB_SHA']+'&event=workflow_dispatch&per_page=100'
+          runs=json.loads(subprocess.check_output(['gh','api','--hostname','github.com',endpoint],timeout=30))['workflow_runs']
+          assert not [r for r in runs if str(r['id'])!=os.environ['GITHUB_RUN_ID']], 'HOLD no repeated run for this commit'
+          keys=('GITHUB_REPOSITORY','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','GITHUB_SHA','WORKFLOW_SHA','RUNNER_OS','RUNNER_ARCH')
+          pathlib.Path('evidence/physical-job/artifact/execution-source.json').write_text(json.dumps({k:os.environ[k] for k in keys},indent=2)+'\n')
+          PY
+          bash scripts/preflight.sh before
+          python3 scripts/verieda_formal_inputs.py
+          cp evidence/formal-job/inputs/restore.json evidence/physical-job/artifact/
+          python3 - <<'PY'
+          import json,pathlib
+          from scripts.verieda_formal_inputs import restore_reviewed_proof,obj,gh_api,validate_metadata
+          from verieda.evidence import read_bundle,verify_bundle
+          from verieda.execution import prepare_action
+          root=pathlib.Path('evidence/formal-job/inputs');data=read_bundle(root/'result.zip');verify_bundle(data)
+          prepare_action(obj(data,'action/package/state.json'),obj(data,'action/package/candidate.json'),root/'action-package')
+          r=json.loads(pathlib.Path('cases/gcd-speed.formal-review.json').read_text());e=r['execution'];endpoint='actions/artifacts/'+str(e['artifact_id'])
+          validate_metadata(obj({'m':gh_api(endpoint)},'m'),{'sha256':e['outer_sha256'],'run_id':str(e['run_id']),'commit':e['commit']},{'id':e['artifact_id'],'bytes':e['artifact_bytes']})
+          restore_reviewed_proof(gh_api(endpoint+'/zip'),root/'reviewed-proof.zip')
+          PY
+          python3 -m verieda execute-physical --package evidence/formal-job/inputs/action-package --verification-package evidence/formal-job/inputs/package --reviewed-proof evidence/formal-job/inputs/reviewed-proof.zip --frozen-root orfs --work evidence/physical-job/native/physical > evidence/physical-job/artifact/dry-run.json
+      - name: Frozen source and image with resource checks
+        run: |
+          set -euo pipefail
+          git init orfs
+          git -C orfs remote add origin https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git
+          git -C orfs fetch --depth=1 origin "$ORFS_COMMIT"
+          git -C orfs checkout --detach FETCH_HEAD
+          test "$(git -C orfs rev-parse HEAD)" = "$ORFS_COMMIT"
+          bash scripts/preflight.sh before-pull
+          docker pull "$ORFS_IMAGE" > evidence/physical-job/artifact/pull.log 2>&1
+          python3 - <<'PY'
+          import json,os,pathlib,subprocess
+          from verieda.execution import check_image_record
+          m=json.loads(subprocess.check_output(['docker','image','inspect',os.environ['ORFS_IMAGE']],timeout=15))[0]
+          record={'image_id':m['Id'],'repo_digests':m['RepoDigests'],'os':m['Os'],'architecture':m['Architecture']}
+          check_image_record(record,json.loads(pathlib.Path('verieda/action_support.json').read_text()))
+          pathlib.Path('evidence/physical-job/artifact/image-identity.json').write_text(json.dumps(record,indent=2)+'\n')
+          PY
+          bash scripts/preflight.sh after
+      - name: One candidate physical experiment and fresh final-netlist Formal
+        run: |
+          set -euo pipefail
+          mkdir evidence/physical-job/inputs
+          name="verieda-physical-$GITHUB_RUN_ID"
+          trap 'docker rm -f "$name" "$name-final-formal" >/dev/null 2>&1 || true' EXIT
+          rc=0
+          timeout --kill-after=5 560 docker run --rm --name "$name" --network none --read-only --workdir /app \
+            --cpus 2 --memory 6g --pids-limit 128 --cap-drop ALL --security-opt no-new-privileges \
+            --ulimit core=0 --ulimit fsize=16777216 --user "$(id -u):$(id -g)" \
+            --tmpfs /tmp:rw,size=67108864 --env PYTHONDONTWRITEBYTECODE=1 --entrypoint /usr/bin/python3 \
+            -v "$GITHUB_WORKSPACE:/app:ro" -v "$GITHUB_WORKSPACE/acceptance:/audit:ro" -v "$GITHUB_WORKSPACE/orfs:/frozen:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/formal-job/inputs/action-package:/package:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/formal-job/inputs/package:/parent:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/formal-job/inputs/reviewed-proof.zip:/reviewed-proof.zip:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/physical-job/artifact/image-identity.json:/image-identity.json:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/physical-job/inputs:/inputs" \
+            -v "$GITHUB_WORKSPACE/evidence/physical-job/native:/work" \
+            "$ORFS_IMAGE" -m verieda execute-physical --package /package --verification-package /parent --reviewed-proof /reviewed-proof.zip \
+            --frozen-root /frozen --work /work/physical --image-identity /image-identity.json --approve-internal-lec-bypass --execute \
+            > evidence/physical-job/artifact/physical-container.log 2>&1 || rc=$?
+          printf '%s\n' "$rc" > evidence/physical-job/artifact/physical-return-code.txt
+          test "$rc" = 0
+          mkdir evidence/physical-job/final-proof
+          rc=0
+          timeout --kill-after=5 330 docker run --rm --name "$name-final-formal" --network none --read-only --workdir /app \
+            --cpus 2 --memory 6g --pids-limit 128 --cap-drop ALL --security-opt no-new-privileges \
+            --ulimit core=0 --ulimit fsize=16777216 --user "$(id -u):$(id -g)" \
+            --tmpfs /tmp:rw,size=67108864 --env PYTHONDONTWRITEBYTECODE=1 --entrypoint /usr/bin/python3 \
+            -v "$GITHUB_WORKSPACE:/app:ro" -v "$GITHUB_WORKSPACE/orfs:/frozen:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/physical-job/native/final-package:/package:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/physical-job/artifact/image-identity.json:/image-identity.json:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/physical-job/final-proof:/work" \
+            "$ORFS_IMAGE" -m verieda execute-formal --package /package --contract /app/contracts/gcd.reset2.json \
+            --frozen-root /frozen --work /work/formal --image-identity /image-identity.json --execute \
+            > evidence/physical-job/artifact/final-formal-container.log 2>&1 || rc=$?
+          printf '%s\n' "$rc" > evidence/physical-job/artifact/final-formal-return-code.txt
+          exit "$rc"
+      - name: Preserve bounded public outputs even on failure
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib,shutil,json
+          from acceptance.verify import seal
+          from verieda.formal_runtime import seal_formal
+          root=pathlib.Path('evidence/physical-job');out=root/'artifact';out.mkdir(parents=True,exist_ok=True)
+          proof=root/'final-proof/formal'
+          if (proof/'receipt.json').is_file() and not (proof/'verifier-result.zip').exists():seal_formal(proof,proof/'verifier-result.zip')
+          sources=[root/'native/physical',root/'native/sta',root/'native/constraints',root/'native/final-package',proof]
+          allowed={'.json','.log','.rpt','.tsv','.tcl','.v','.sdc','.odb','.gds','.spef','.ys','.lib','.zip','.vcd'}
+          chosen=[]
+          for source in sources:
+              if not source.is_dir():continue
+              for p in source.rglob('*'):
+                  if p.is_symlink():raise ValueError('HOLD linked output')
+                  if p.is_file() and p.suffix in allowed:
+                      if not 0<=p.stat().st_size<=16*1024*1024:raise ValueError('HOLD per-file evidence budget')
+                      chosen.append(p)
+          if len(chosen)>1000 or sum(p.stat().st_size for p in chosen)>128*1024*1024:raise ValueError('HOLD aggregate evidence budget')
+          for p in chosen:
+              dest=out/'outputs'/p.relative_to(root);dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,dest)
+          (out/'status.json').write_text(json.dumps({'candidate_acceptance':'NOT_EVALUATED','final_formal':'FRESH_REVIEW_REQUIRED','constraint_gate':'UNKNOWN','inputs_unchanged':'requires offline recovery audit'})+'\n')
+          seal(out)
+          PY
+      - name: Upload explicit public evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: verieda-candidate-physical-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            evidence/physical-job/artifact/
+            evidence/environment/lscpu.txt
+            evidence/environment/uname-*.txt
+            evidence/environment/resources-*.txt
+            evidence/environment/free-*.txt
+            evidence/environment/df-*.txt
+            evidence/environment/docker-cli.txt
+            evidence/environment/docker-version.txt
+          if-no-files-found: error
+          retention-days: 7

@@ -3,7 +3,8 @@ import math
 from .case import digest
 from .policy import _bound_state,validate_candidate
 
-def evaluate(before,after,candidate):
+def evaluate(before,after,candidate,budget_seconds=None):
+    if budget_seconds is not None and (type(budget_seconds) is not int or not 0<=budget_seconds<=3600):raise ValueError("native comparison budget must be integer 0..3600")
     reject=[];unknown=[]
     malformed=any(not isinstance(x,dict) for x in (before,after,candidate))
     before=before if isinstance(before,dict) else {}
@@ -50,5 +51,30 @@ def evaluate(before,after,candidate):
         elif aa>ba*1.10:reject.append('AREA_OVERHEAD_EXCEEDS_10_PERCENT')
     except (ValueError,KeyError,TypeError,OverflowError):unknown.append('MALFORMED_STATE_OR_CANDIDATE')
     result['verdict']='REJECTED' if reject else 'INCONCLUSIVE' if unknown else 'ACCEPTED'
+    def observed(state,name):
+        metrics=state.get('metrics',{});row=metrics.get(name,{}) if isinstance(metrics,dict) else {}
+        v=row.get('value') if isinstance(row,dict) else None
+        return v if type(v) in (int,float) and math.isfinite(v) else None
+    comparison={}
+    for name in ('WNS','TNS','stdcell_area','hold_slack'):
+        bv,av=observed(before,name),observed(after,name)
+        comparison[name]={'before':bv,'after':av,'delta':av-bv if bv is not None and av is not None else None,
+                          'status':'AVAILABLE' if bv is not None and av is not None else 'NOT_AVAILABLE'}
+    gain=comparison['WNS']['delta'];wns=comparison['WNS']['after']
+    unbound=any(r.startswith(('CHANGED_','ILLEGAL_','ACTION_EXECUTION_MISMATCH','FORMAL_CONTRACT_CHANGED','NO_INDEPENDENT_EXECUTION')) for r in reject)
+    failed=any(r in reject for r in ('FAILED_RTL_SIMULATION','FAILED_FORMAL','FAILED_PHYSICAL','FAILED_ROUTER_DRC','FAILED_GDS_GENERATION','FAILED_GDS_READ'))
+    unbound=unbound or 'MALFORMED_STATE_OR_CANDIDATE' in unknown
+    outcome=('VERIFICATION_INSUFFICIENT' if unbound else 'FUNCTIONAL_OR_PHYSICAL_CHECK_FAILED' if failed else
+             'OPTIMIZATION_ACCEPTABLE' if result['verdict']=='ACCEPTED' else
+             'METRIC_REGRESSION' if (gain is not None and gain<0) or 'AREA_OVERHEAD_EXCEEDS_10_PERCENT' in reject else
+             'IMPROVED_BUT_CONSTRAINTS_UNMET' if gain is not None and gain>0 and (wns<0 or 'FAILED_TIMING' in reject) else
+             'VERIFICATION_INSUFFICIENT' if unknown else 'NO_IMPROVEMENT')
+    runtime=after.get('execution',{}).get('runtime_seconds') if isinstance(after.get('execution'),dict) else None
+    valid_runtime=type(runtime) in (int,float) and math.isfinite(runtime) and runtime>=0
+    stop=not unbound and budget_seconds is not None and valid_runtime and runtime>budget_seconds
+    result.update(comparison=comparison,qor_outcome=outcome,outcome_class='STOP_BUDGET' if stop else outcome,
+                  decision='STOP_BUDGET' if stop else 'ACCEPT_CANDIDATE' if result['verdict']=='ACCEPTED' else 'REJECT_CANDIDATE' if result['verdict']=='REJECTED' else 'CONTINUE_VERIFICATION',
+                  budget={'cap_native_seconds':budget_seconds,'observed_native_seconds':runtime if valid_runtime else None,
+                          'scope':'bound after execution receipt only; not campaign/job/billing time'},execution_authorized=False)
     result['evaluation_id']=digest(result)
     return result

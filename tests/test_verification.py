@@ -12,7 +12,35 @@ class VerificationTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
   cls.state=load_case(json.loads((ROOT/'cases/gcd.json').read_text()),SMOKE,NATIVE)
+ def test_reviewed_real_proof_unlocks_only_exact_synthesis_subject_with_scope_check(self):
+  result=ROOT/'evidence/candidate-formal-b19cc94faa0d/verifier-result.zip'
+  h='06619a67e1060a3a0c396b9dcba5867cb5134f46e75074229df6d936471d660b'
+  package=ROOT/'evidence/verification-handoff-20261021-v1/package'
+  r=v.review_candidate(self.state,RESULT,RESULT_SHA,600,result,h,None,package,ROOT/'contracts/gcd.reset2.json')
+  self.assertEqual(r['candidate_status'],'READY_FOR_PHYSICAL')
+  self.assertEqual(r['verification']['gates']['formal'],'PASS_RESET_CONTRACT_UNBOUNDED')
+  self.assertEqual(r['verification']['gates']['timing'],'NOT_RUN')
+  self.assertFalse(r['execution_authorized']);self.assertEqual(r['design_acceptance'],'NOT_EVALUATED')
+  # Without the checked source/model scope, the marker alone is insufficient.
+  r=v.review_candidate(self.state,RESULT,RESULT_SHA,300,result,h)
+  self.assertEqual(r['candidate_status'],'PROOF_REVIEW_PENDING')
  def subject(self):return v.load_subject(self.state,RESULT,RESULT_SHA)
+ def test_final_netlist_requires_fresh_subject_and_proof(self):
+  parent=self.subject()
+  with tempfile.TemporaryDirectory() as tmp:
+   tmp=pathlib.Path(tmp);final=tmp/'final';final.mkdir()
+   (final/'6_final.v').write_bytes(b'new final netlist');(final/'6_final.odb').write_bytes(b'new odb')
+   receipt={'candidate_id':parent['candidate_id'],'parent_subject_id':parent['subject_id'],'return_code':0,'phase':'PHYSICAL_FINAL_OUTPUTS',
+    'netlist_sha256':hashlib.sha256((final/'6_final.v').read_bytes()).hexdigest(),'odb_sha256':hashlib.sha256((final/'6_final.odb').read_bytes()).hexdigest()}
+   (final/'physical-receipt.json').write_text(json.dumps(receipt))
+   v.prepare_final_verification(parent,final,tmp/'package')
+   subject=json.loads((tmp/'package/subject.json').read_text());plan=json.loads((tmp/'package/plan.json').read_text())
+   self.assertNotEqual(subject['subject_id'],parent['subject_id']);self.assertEqual(subject['execution_scope'],'PHYSICAL_FINAL')
+   self.assertEqual(plan['next_check']['external_limits']['job_seconds'],1200)
+   self.assertEqual(plan['next_check']['kind'],'FORMAL_FINAL');self.assertEqual(plan['gates']['formal'],'NOT_RUN')
+   self.assertIsNone(v._registered_formal_review(subject,'06619a67e1060a3a0c396b9dcba5867cb5134f46e75074229df6d936471d660b'))
+   receipt['return_code']=False;(final/'physical-receipt.json').write_text(json.dumps(receipt))
+   with self.assertRaises(ValueError):v.prepare_final_verification(parent,final,tmp/'bad')
  def test_real_synthesis_requires_new_proof_and_preserves_reference(self):
   s=self.subject();p=v.plan_verification(s,300)
   self.assertEqual(p['decision'],'PREPARE_FORMAL_CHECK')

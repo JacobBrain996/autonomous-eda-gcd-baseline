@@ -19,6 +19,19 @@ class AdoptionTests(unittest.TestCase):
         after['inputs']['6_final.v']='e'*64;after['provenance']['acceptance']['sha256']='f'*64
         after['execution']={'candidate_id':c['candidate_id'],'state_id':before['state_id'],'return_code':0,'changes':c['changes'],'phase':'RTL_TO_GDS','status':'COMPLETED'}
         bind(after);return before,after,c
+    def test_comparison_classes_distinguish_partial_gain_regression_failed_checks_and_budget(self):
+        b,a,c=self.setup_states();a['metrics']['WNS']['value']=-0.05;a['gates']['timing']='FAIL';bind(a)
+        r=evaluate(b,a,c);self.assertEqual(r['outcome_class'],'IMPROVED_BUT_CONSTRAINTS_UNMET');self.assertNotEqual(r['verdict'],'ACCEPTED')
+        b,a,c=self.setup_states();a['metrics']['WNS']['value']=-0.2;bind(a)
+        self.assertEqual(evaluate(b,a,c)['outcome_class'],'METRIC_REGRESSION')
+        b,a,c=self.setup_states();a['gates']['router_drc']='FAIL';bind(a)
+        self.assertEqual(evaluate(b,a,c)['outcome_class'],'FUNCTIONAL_OR_PHYSICAL_CHECK_FAILED')
+        b,a,c=self.setup_states();a['gates']['formal']='UNKNOWN';bind(a)
+        self.assertEqual(evaluate(b,a,c)['outcome_class'],'VERIFICATION_INSUFFICIENT')
+        b,a,c=self.setup_states();a['execution']['runtime_seconds']=3;bind(a)
+        r=evaluate(b,a,c,budget_seconds=2)
+        self.assertEqual(r['decision'],'STOP_BUDGET');self.assertEqual(r['qor_outcome'],'OPTIMIZATION_ACCEPTABLE')
+        self.assertEqual(r['comparison']['TNS']['status'],'NOT_AVAILABLE')
     def test_acceptance_requires_all_independent_gates_and_improvement(self):
         b,a,c=self.setup_states();r=evaluate(b,a,c)
         self.assertEqual(r['verdict'],'ACCEPTED');self.assertAlmostEqual(r['WNS_improvement_ns'],0.1)

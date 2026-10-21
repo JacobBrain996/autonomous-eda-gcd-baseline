@@ -75,11 +75,15 @@ def main():
     for side in ('before','after'):
         for part in ('profile','smoke','acceptance'):p.add_argument('--'+side+'-'+part,required=True)
     p.add_argument('--candidate',required=True)
+    p.add_argument('--budget-seconds',type=int)
     p=sub.add_parser('prepare-action',help='write an exclusive isolated synthesis package; never executes EDA')
     for part in ('profile','smoke','acceptance','candidate','output'):p.add_argument('--'+part,required=True)
     p=sub.add_parser('execute-action',help='native Linux isolated synthesis; default NOT_RUN, needs separate authorization')
     for part in ('package','frozen-root','work'):p.add_argument('--'+part,required=True)
     p.add_argument('--execute',action='store_true');p.add_argument('--image-identity',help='minimal host Docker image identity record, required for execution')
+    p=sub.add_parser('execute-physical',help='one frozen candidate physical experiment; default NOT_RUN; fresh final proof required')
+    for part in ('package','verification-package','reviewed-proof','frozen-root','work'):p.add_argument('--'+part,required=True)
+    p.add_argument('--execute',action='store_true');p.add_argument('--approve-internal-lec-bypass',action='store_true');p.add_argument('--image-identity')
     p=sub.add_parser('seal-action',help='seal only allowlisted saved action outputs; no execution')
     for part in ('package','work','output'):p.add_argument('--'+part,required=True)
     p=sub.add_parser('inspect-action',help='inspect saved phase evidence and bounded outcome history; no adoption')
@@ -142,6 +146,11 @@ def main():
             case=load_case(read_json(args.profile),args.smoke,args.acceptance)
             state=advance_action(case,args.result,args.expected_sha256,args.budget_seconds,read_json(args.history) if args.history else [])
             rc=2 if state['observation']['evidence_gate']=='FAIL' else 0
+        elif args.command=='execute-physical':
+            from .execution import execute_physical
+            state=execute_physical(args.package,args.verification_package,args.reviewed_proof,args.frozen_root,args.work,args.execute,
+                                   args.approve_internal_lec_bypass,read_json(args.image_identity,65536) if args.image_identity else None)
+            rc=0 if state['status'] in ('NOT_RUN','PHYSICAL_AND_OBSERVERS_COMPLETED') else 2
         elif args.command=='seal-action':
             state=seal_action(args.package,args.work,args.output);rc=0
         elif args.command=='inspect-action':
@@ -160,7 +169,7 @@ def main():
         elif args.command=='evaluate':
             before=load_case(read_json(args.before_profile),args.before_smoke,args.before_acceptance)
             after=load_case(read_json(args.after_profile),args.after_smoke,args.after_acceptance)
-            state=evaluate(before,after,read_json(args.candidate));rc=0
+            state=evaluate(before,after,read_json(args.candidate),args.budget_seconds);rc=0
         elif args.command=='inspect':
             state=inspect(args.artifact,args.expect,args.expected_sha256)
             rc=2 if state['gates']['evidence']=='FAIL' else 0

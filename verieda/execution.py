@@ -1,5 +1,5 @@
 """Isolated synthesis adapter. Package preparation never executes an EDA tool."""
-import hashlib,json,os,pathlib,platform,re,signal,subprocess,time
+import hashlib,json,os,pathlib,platform,re,signal,subprocess,time,shutil,math
 from .case import read_json,digest
 from .policy import validate_candidate
 
@@ -137,7 +137,8 @@ def _native_identity(root,state,manifest):
     if head!=state['frozen']['orfs_commit']:raise ValueError('frozen ORFS Git head mismatch')
     return hashes
 
-def execute_action(package,frozen_root,work,execute=False,image_record=None):
+def execute_action(package,frozen_root,work,execute=False,image_record=None,budget_seconds=300):
+    if type(budget_seconds) is not int or not 1<=budget_seconds<=300:raise ValueError("action budget must be integer 1..300")
     manifest=verify_package(package)
     if not execute:return {'status':'NOT_RUN','candidate_id':manifest['candidate_id'],'phase':'SYNTHESIS_ONLY','requires_explicit_execution':True}
     image=check_image_record(image_record,manifest['support'])
@@ -152,12 +153,12 @@ def execute_action(package,frozen_root,work,execute=False,image_record=None):
              'source_tool_sha256':identity,'design_acceptance':'NOT_EVALUATED','FORMAL_EQUIVALENCE_GATE':'NOT_RUN',
              'TIMING_GATE':'NOT_RUN','image_host_record':image,'OCI_IDENTITY_GATE':'HOST_RECORD_MATCH_NOT_ATTESTED'}
     try:
-        pre=_run(make_argv(bundle/'effective.mk',out,'verieda-effective',state['design'],state['platform']),root/'flow',env,out/'effective.log',20)
+        pre=_run(make_argv(bundle/'effective.mk',out,'verieda-effective',state['design'],state['platform']),root/'flow',env,out/'effective.log',min(20,budget_seconds))
         receipt['steps'].append(pre);receipt['return_code']=pre['return_code']
         if pre['return_code']!=0:receipt['status']='TIMEOUT' if pre['timeout'] else 'ERROR'
         elif (out/'effective.log').read_bytes()!=expected_effective(state['design'],state['platform']):receipt['status']='HOLD_EFFECTIVE_VARIABLES'
         else:
-            remaining=300-(time.monotonic()-start)
+            remaining=budget_seconds-(time.monotonic()-start)
             if remaining<=0:receipt.update(status='TIMEOUT',return_code=124)
             else:
                 run=_run(make_argv(bundle/'effective.mk',out,'synth',state['design'],state['platform']),root/'flow',env,out/'synth.log',remaining)
@@ -173,4 +174,139 @@ def execute_action(package,frozen_root,work,execute=False,image_record=None):
     except (OSError,ValueError,subprocess.SubprocessError) as ex:receipt.update(status='ERROR',error=str(ex))
     receipt['runtime_seconds']=time.monotonic()-start
     with (out/'action-execution.json').open('xb') as f:f.write(_json_bytes(receipt))
+    return receipt
+
+
+def physical_argv(effective,work,approve_internal_lec_bypass=False,design='gcd',platform_name='nangate45'):
+    """Explicit engineering-only bypass; final independent Formal is mandatory."""
+    if approve_internal_lec_bypass is not True:raise ValueError('separate approval for internal LEC/SEC diagnostic bypass required')
+    argv=make_argv(effective,work,'synth',design,platform_name)
+    return [({'LEC_CHECK=1':'LEC_CHECK=0','SEC_CHECK=1':'SEC_CHECK=0'}.get(a,a)) for a in argv[:-1]]+['all']
+
+
+def check_rebuilt_netlist(path,expected_sha256):
+    p=_unlinked(path)
+    if not p.is_file() or not 0<p.stat().st_size<=16*1024*1024 or _sha(p)!=expected_sha256:
+        raise ValueError('HOLD regenerated synthesis netlist differs from proved candidate')
+    return expected_sha256
+
+
+def observe_physical_metrics(log_directory,sta_directory):
+    """Bounded saved reports only; cross-check two observations, never acceptance."""
+    from .evidence import metric
+    logs=_unlinked(log_directory);sta=_unlinked(sta_directory);data={}
+    for name in ('6_report.json','5_2_route.json'):
+        p=_unlinked(logs/name)
+        if not p.is_file() or not 0<p.stat().st_size<=16*1024*1024:raise ValueError('missing bounded physical report '+name)
+        data[name]=p.read_bytes()
+    specs={'setup_slack':('finish__timing__setup__ws','ns'),'TNS':('finish__timing__setup__tns','ns'),
+           'hold_slack':('finish__timing__hold__ws','ns'),'stdcell_area':('finish__design__instance__area__stdcell','um^2')}
+    metrics={k:metric(data,'6_report.json',key,unit) for k,(key,unit) in specs.items()}
+    metrics['router_drc']=metric(data,'5_2_route.json','detailedroute__route__drc_errors','count')
+    if any(v['status']!='AVAILABLE' for v in metrics.values()):raise ValueError('incomplete/ambiguous physical metrics; preserve raw reports')
+    metrics['WNS']={**metrics['setup_slack'],'value':min(0,metrics['setup_slack']['value'])}
+    drc=metrics['router_drc']['value']
+    if drc<0 or int(drc)!=drc or metrics['stdcell_area']['value']<=0:raise ValueError('invalid DRC count or cell area')
+    paths={name:_unlinked(sta/(name+'.rpt')) for name in ('units','wns','tns','hold_wns','hold_tns')}
+    if any(not p.is_file() or not 0<p.stat().st_size<=1024*1024 for p in paths.values()):raise ValueError('bounded native STA reports required')
+    if re.findall(r'(?m)^\s*time\s+(\S+)\s*$',paths['units'].read_text())!=['1ns']:raise ValueError('native STA time unit must be 1ns')
+    observed={}
+    for name,cmd,kind in [('wns','wns','max'),('tns','tns','max'),('hold_wns','wns','min'),('hold_tns','tns','min')]:
+        match=re.fullmatch(r'\s*'+cmd+' '+kind+r'\s+(\S+)\s*',paths[name].read_text())
+        if not match:raise ValueError('unsupported native STA format '+name)
+        value=float(match[1])
+        if not math.isfinite(value) or value>0:raise ValueError('invalid clipped native STA metric '+name)
+        observed[name]=value
+    for w,t in [('wns','tns'),('hold_wns','hold_tns')]:
+        if (observed[w]<0)!=(observed[t]<0) or observed[t]>observed[w]:raise ValueError('inconsistent native WNS/TNS')
+    for native,reported in [('wns',metrics['WNS']['value']),('tns',metrics['TNS']['value']),('hold_wns',min(0,metrics['hold_slack']['value']))]:
+        if abs(observed[native]-reported)>5e-6:raise ValueError('native STA/finish mismatch '+native)
+    return {'schema':'verieda.physical-metrics-observation.v1','metrics':metrics,'native_clipped_metrics_ns':observed,
+            'source_sha256':{**{n:hashlib.sha256(b).hexdigest() for n,b in data.items()},**{n+'.rpt':_sha(p) for n,p in paths.items()}},
+            'design_acceptance':'NOT_EVALUATED','constraint_gate':'UNKNOWN','final_formal':'NOT_RUN'}
+
+
+def execute_physical(package,verification_package,reviewed_proof,frozen_root,work,execute=False,
+                     approve_internal_lec_bypass=False,image_record=None):
+    """One frozen candidate physical experiment, not design acceptance.
+
+    Fixed native mount convention deliberately matches the actually executed
+    GCD STA initializer. Other designs remain unsupported by this adapter.
+    """
+    from .verification import verify_verification_package,_registered_formal_review,prepare_final_verification
+    from .formal_review import inspect_formal
+    from .sta_min import build_hold_script
+    from acceptance.verify import capture_reports,snapshots
+    manifest=verify_package(package);verify_verification_package(verification_package)
+    state=read_json(pathlib.Path(package)/'state.json',4*1024*1024)
+    subject=read_json(pathlib.Path(verification_package)/'subject.json')
+    if (subject['candidate_id']!=manifest['candidate_id'] or subject['state_id']!=state['state_id']
+        or subject['execution_scope']!='SYNTHESIS_ONLY'):raise ValueError('foreign physical parent')
+    proof=_unlinked(reviewed_proof)
+    if not proof.is_file() or not 0<proof.stat().st_size<=32*1024*1024:raise ValueError('bounded reviewed proof required')
+    review=_registered_formal_review(subject,_sha(proof))
+    contract=HERE.parent/'contracts/gcd.reset2.json'
+    if not review or inspect_formal(verification_package,contract,proof,_sha(proof))['scope_structure_gate']!='PASS_STATIC_CHECKS':
+        raise ValueError('scoped reviewed synthesis proof required')
+    if not execute:return {'status':'NOT_RUN','candidate_id':manifest['candidate_id'],'execution_authorized':False,
+                           'requires':['separate external execution authorization','explicit internal LEC/SEC bypass approval','fresh final-netlist proof']}
+    physical_argv('/package/effective.mk','/work/physical/action',approve_internal_lec_bypass)
+    root=_unlinked(frozen_root);out=_unlinked(work);inputs=_unlinked('/inputs');sta=_unlinked('/work/sta')
+    if str(root)!='/frozen' or str(out)!='/work/physical' or out.exists() or sta.exists() or not inputs.is_dir() or any(inputs.iterdir()):
+        raise ValueError('fresh fixed physical/STA/input mount convention required')
+    # Admission before creating output or starting synthesis.
+    image=check_image_record(image_record,manifest['support']);identity=_native_identity(root,state,manifest)
+    out.mkdir();started=time.monotonic()
+    receipt={'schema':'verieda.physical-execution.v1','phase':'PHYSICAL_FINAL_OUTPUTS','status':'ERROR','return_code':None,
+             'candidate_id':subject['candidate_id'],'state_id':state['state_id'],'parent_subject_id':subject['subject_id'],
+             'changes':read_json(pathlib.Path(package)/'candidate.json')['changes'],'source_tool_sha256':identity,
+             'image_host_record':image,'steps':[],'internal_formal':'NOT_RUN_WITH_APPROVED_DIAGNOSTIC_BYPASS',
+             'independent_final_formal':'NOT_RUN','design_acceptance':'NOT_EVALUATED','constraint_gate':'UNKNOWN',
+             'reviewed_synthesis_proof':review,'native_source_sha256':_sha(__file__)}
+    try:
+        synthesis=execute_action(package,root,out/'action',True,image_record,60)
+        receipt['synthesis']=synthesis
+        if synthesis['status']!='SYNTHESIS_COMPLETED':raise ValueError('synthesis prerequisite reconstruction failed')
+        paths=design_paths(state['design'],state['platform'])
+        receipt['rebuilt_netlist_sha256']=check_rebuilt_netlist(out/'action'/paths['netlist'],subject['target']['netlist_sha256'])
+        env=clean_environment(out/'action');flow=root/'flow'
+        step=_run(physical_argv(pathlib.Path(package)/'effective.mk',out/'action',True),flow,env,out/'physical.log',300)
+        receipt['steps'].append(step);receipt['return_code']=step['return_code']
+        if step['return_code']:raise ValueError('physical flow failed; no automatic retry')
+        receipt['retained_synthesis_netlist_sha256']=check_rebuilt_netlist(out/'action'/paths['netlist'],subject['target']['netlist_sha256'])
+        final=out/'final';final.mkdir()
+        base=out/'action/results/nangate45/gcd/verieda'
+        for name in ('6_final.v','6_final.odb','6_final.sdc','6_final.gds'):
+            p=_unlinked(base/name)
+            if not p.is_file() or not 0<p.stat().st_size<=16*1024*1024:raise ValueError('missing/bounded final output '+name)
+            shutil.copyfile(p,final/name)
+        for name in ('6_final.v','6_final.odb','6_final.sdc'):shutil.copyfile(final/name,inputs/name)
+        receipt.update(netlist_sha256=_sha(final/'6_final.v'),odb_sha256=_sha(final/'6_final.odb'))
+        sta.mkdir();script=sta/'candidate.tcl';script.write_bytes(build_hold_script())
+        receipt['sta_script_sha256']=_sha(script)
+        openroad=next(p for p in state['tools'] if pathlib.PurePosixPath(p).name=='openroad')
+        step=_run([openroad,'-no_init','-exit',str(script)],flow,env,sta/'tool.log',90)
+        receipt['steps'].append(step);receipt['return_code']=step['return_code']
+        if step['return_code']:raise ValueError('independent max/min STA failed')
+        capture_reports(sta,['units','wns','tns','hold_wns','hold_tns'])
+        metrics=observe_physical_metrics(out/'action/logs/nangate45/gcd/verieda',sta)
+        (out/'metrics.json').write_bytes(_json_bytes(metrics))
+        # Reuse the native evaluated-SDC observer; it explicitly keeps full gate UNKNOWN.
+        snapshots()
+        klayout=pathlib.Path('/usr/bin/klayout')
+        receipt['klayout_sha256']=_sha(klayout)
+        script=out/'read_gds.py'
+        script.write_text('import pya\nl=pya.Layout()\nl.read("'+str(final/'6_final.gds')+'")\nassert any(c.name=="gcd" for c in l.top_cells())\nassert not l.cell("gcd").bbox().empty()\nprint("GDS_READ_GATE=PASS")\n')
+        step=_run([str(klayout),'-b','-r',str(script)],flow,env,out/'gds-read.log',30)
+        receipt['steps'].append(step);receipt['return_code']=step['return_code']
+        if step['return_code'] or 'GDS_READ_GATE=PASS' not in (out/'gds-read.log').read_text():raise ValueError('GDS read failed')
+        receipt.update(status='PHYSICAL_AND_OBSERVERS_COMPLETED',return_code=0,
+                       final_files={p.name:_sha(p) for p in final.iterdir()})
+        (final/'physical-receipt.json').write_bytes(_json_bytes(receipt))
+        prepare_final_verification(subject,final,pathlib.Path('/work/final-package'))
+    except (OSError,ValueError,subprocess.SubprocessError) as ex:
+        receipt.update(status='HOLD_EXECUTION_OR_EVIDENCE',error=str(ex))
+        if receipt['return_code'] in (None,0):receipt['return_code']=2
+    receipt['runtime_seconds']=time.monotonic()-started
+    (out/'physical-execution.json').write_bytes(_json_bytes(receipt))
     return receipt

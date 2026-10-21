@@ -12,6 +12,45 @@ class ExecutionTests(unittest.TestCase):
     def setUpClass(cls):
         cls.state=load_case(json.loads((ROOT/'cases/gcd.json').read_text()),SMOKE,NATIVE)
         cls.candidate=propose(cls.state,600,[])['selected_candidate']
+    def test_physical_metrics_require_native_units_and_agree_with_finish(self):
+        from verieda.execution import observe_physical_metrics
+        with tempfile.TemporaryDirectory() as tmp:
+            root=pathlib.Path(tmp);logs=root/'logs';sta=root/'sta';logs.mkdir();sta.mkdir()
+            finish={'finish__timing__setup__ws':-0.05,'finish__timing__setup__tns':-0.2,'finish__timing__hold__ws':0.08,'finish__design__instance__area__stdcell':999}
+            (logs/'6_report.json').write_text(json.dumps(finish));(logs/'5_2_route.json').write_text(json.dumps({'detailedroute__route__drc_errors':0}))
+            for n,text in {'units':'time 1ns','wns':'wns max -0.050000000','tns':'tns max -0.200000000','hold_wns':'wns min 0.000000000','hold_tns':'tns min 0.000000000'}.items():(sta/(n+'.rpt')).write_text(text)
+            result=observe_physical_metrics(logs,sta)
+            self.assertEqual(result['metrics']['WNS']['value'],-0.05);self.assertEqual(result['metrics']['router_drc']['value'],0)
+            self.assertEqual(result['design_acceptance'],'NOT_EVALUATED')
+            (sta/'wns.rpt').write_text('wns max -0.06')
+            with self.assertRaises(ValueError):observe_physical_metrics(logs,sta)
+    def test_physical_command_requires_separate_bypass_and_keeps_constraints(self):
+        from verieda.execution import physical_argv,check_rebuilt_netlist
+        with self.assertRaises(ValueError):physical_argv('/package/effective.mk','/work/action')
+        for value in (1,'yes',None):
+            with self.assertRaises(ValueError):physical_argv('/package/effective.mk','/work/action',value)
+        argv=physical_argv('/package/effective.mk','/work/action',True)
+        self.assertEqual(argv[-1],'all');self.assertIn('ABC_AREA=0',argv)
+        self.assertIn('LEC_CHECK=0',argv);self.assertIn('SEC_CHECK=0',argv)
+        self.assertFalse(any('CLOCK_PERIOD=' in a for a in argv))
+        with tempfile.TemporaryDirectory() as tmp:
+            p=pathlib.Path(tmp)/'candidate.v';p.write_bytes(b'rebuilt')
+            import hashlib
+            h=hashlib.sha256(p.read_bytes()).hexdigest()
+            self.assertEqual(check_rebuilt_netlist(p,h),h)
+            with self.assertRaises(ValueError):check_rebuilt_netlist(p,'0'*64)
+    def test_physical_dry_run_checks_proof_but_never_runs_tools(self):
+        from verieda.execution import execute_physical
+        from test_verification import RESULT,RESULT_SHA
+        from verieda.verification import prepare_verification
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp=pathlib.Path(tmp);prepare_action(self.state,self.candidate,tmp/'action')
+            prepare_verification(self.state,RESULT,RESULT_SHA,tmp/'verify',300)
+            proof=ROOT/'evidence/candidate-formal-b19cc94faa0d/verifier-result.zip'
+            with patch('verieda.execution._run',side_effect=AssertionError('no EDA')):
+                result=execute_physical(tmp/'action',tmp/'verify',proof,'/missing','/work/physical')
+            self.assertEqual(result['status'],'NOT_RUN');self.assertFalse(result['execution_authorized'])
+            with self.assertRaises(ValueError):execute_physical(tmp/'action',tmp/'verify',proof,'/missing','/work/physical',True)
     def test_package_is_exclusive_bound_and_no_execution_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             out=pathlib.Path(tmp)/'bundle';prepare_action(self.state,self.candidate,out)

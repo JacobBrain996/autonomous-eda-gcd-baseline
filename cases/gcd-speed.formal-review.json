@@ -1,0 +1,41 @@
+{
+  "schema": "verieda.reviewed-formal.v1",
+  "verdict": "PASS_RESET_CONTRACT_UNBOUNDED",
+  "execution_scope": "SYNTHESIS_ONLY",
+  "subject_id": "9e6ec436fda9ec6c49fa6cf6998277f08b1b0d29efc27af31a0edaa65d7ee600",
+  "candidate_id": "499793611493800ca327c5630a19ddd5620d1857df7755744398c7025a72a86b",
+  "archive_sha256": "06619a67e1060a3a0c396b9dcba5867cb5134f46e75074229df6d936471d660b",
+  "netlist_sha256": "cacc9a64686672f85d077c42c2fa2639fee1b649a6c9754b4297ff6725884785",
+  "contract_sha256": "a87c42b80d0978bd172a1c424254b16df2d10d46941126ae07ba7eaaed893533",
+  "engine_sha256": "5cd52bc790d39b1e59a88112e9132ef8de338c2a26e4b0df8222d937e65bab92",
+  "output_bits": 18,
+  "reset_edges": 2,
+  "execution": {
+    "run_id": 39617534483,
+    "commit": "b19cc94faa0d4eac00f9fbf35bfa28d5af50cdf2",
+    "artifact_id": 12353236990,
+    "outer_sha256": "5dc22e660b92263c08d67e5729c5f4f3e13a0152c7fae73dd637b483ba7336bc",
+    "artifact_bytes": 1966746
+  },
+  "reviewed_files": {
+    "miter.v": "d2a18d637a6b86c4c8d1e3dc7d6cd6a75e5103cbc0d75f10685e2b5be62481d4",
+    "proof.ys": "a8e5b38751914e698b134f1e8a1b9d1bfa1ab2dd32493fa68b3e3c8b1e208e85",
+    "proof.log": "b42ca99af4f169991bf215e5699e1feb575af483352a382a76a176720e523794",
+    "state_relation.v": "43cb9c63e95cbd884c4dc4a1f8d7c139d020dd88b31f052abd090521a5b41b53",
+    "coverage.json": "0be3f2ed532b774d521848a1dd374d1201473f25348aaccf2440b2c4b983e399",
+    "receipt.json": "517a7413f8051cc416b3f25c33b19dd88e4460d319fd0f2244c7a2098022d830"
+  },
+  "basis": [
+    "API/workflow/artifact and approved source binding audited offline",
+    "distinct original RTL and new mapped gate inputs",
+    "all 18 outputs and undefined guards after two common synchronous reset edges",
+    "complete 44-type functional model closure; positive common clock; no blackboxes",
+    "original mismatch retained in strengthened property; relation proved, never assumed",
+    "successful base and temporal induction at length 2, rc 0; not finite BMC"
+  ],
+  "trust": "explicit evidence review trusting pinned Yosys/SAT and GitHub execution; not an independently checked SAT certificate",
+  "limits": [
+    "only this synthesis netlist and declared reset/defined-input contract",
+    "not proof of final physical netlist, timing, constraints, DRC, GDS or QoR improvement"
+  ]
+}

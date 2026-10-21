@@ -4,7 +4,7 @@ Planning core is design-independent; load_subject uses the existing GCD action
 adapter. Result archives are observations, not certified proof receipts.
 """
 import copy,hashlib,json,math,pathlib,re,zipfile
-from .case import digest
+from .case import digest,read_json
 from .policy import _bound_state,validate_candidate
 from .action_results import inspect_action
 from .evidence import read_bundle,verify_bundle,object_json
@@ -55,20 +55,21 @@ def _validate(subject):
   for group in ('tools','library'):
    if not isinstance(subject[group],dict) or not subject[group] or any(not isinstance(k,str) or not _hex(v) for k,v in subject[group].items()):raise ValueError('missing tool/library identity')
   if len(subject['library'])!=1 or any(not isinstance(subject[k],str) or not subject[k] for k in ('design','platform')):raise ValueError('incomplete design/library identity')
-  if subject['execution_scope']!='SYNTHESIS_ONLY':raise ValueError('unsupported verification phase')
+  if subject['execution_scope'] not in ('SYNTHESIS_ONLY','PHYSICAL_FINAL'):raise ValueError('unsupported verification phase')
+  if subject['execution_scope']=='PHYSICAL_FINAL' and any(not _hex(subject.get(k)) for k in ('parent_subject_id','physical_receipt_sha256')):raise ValueError('final phase requires physical parent and receipt identities')
   if 'formal_contract' not in subject or (subject['formal_contract'] is not None and not isinstance(subject['formal_contract'],str)):raise ValueError('missing/malformed formal contract')
  except (KeyError,TypeError) as ex:raise ValueError('incomplete verification subject') from ex
 
 def _formal_task(subject):
  tools=[h for p,h in subject['tools'].items() if pathlib.PurePosixPath(p).name=='yosys']
  if len(tools)!=1:raise ValueError('exactly one bound Yosys binary required')
- task={'schema':'verieda.verification-task.v1','kind':'FORMAL_SYNTHESIS','design':subject['design'],'platform':subject['platform'],
+ task={'schema':'verieda.verification-task.v1','kind':'FORMAL_FINAL' if subject['execution_scope']=='PHYSICAL_FINAL' else 'FORMAL_SYNTHESIS','design':subject['design'],'platform':subject['platform'],
   'inputs':{'subject_id':subject['subject_id'],'artifact_sha256':subject['artifact_sha256'],
    'netlist_sha256':subject['target']['netlist_sha256'],'rtl_sha256':subject['frozen']['rtl_sha256'],
    'sdc_sha256':subject['frozen']['sdc_sha256'],'library_sha256':next(iter(subject['library'].values())),
    'engine_sha256':tools[0],'contract':subject['formal_contract']},
   'cap_seconds':CAP_SECONDS,'requires_external_authorization':True,
-  'external_limits':{'jobs':1,'job_seconds':600,'runner':'ubuntu-24.04-standard-public','automatic_retry':False},
+  'external_limits':{'jobs':1,'job_seconds':1200 if subject['execution_scope']=='PHYSICAL_FINAL' else 600,'runner':'ubuntu-24.04-standard-public','automatic_retry':False},
   'requirements':['discover current cell types and derive complete functional model closure from bound source library',
    'gold is original RTL; gate is this candidate netlist; reject unsupported cells or blackboxes',
    'validate reset, clock, initial state and every top output against declared contract',
@@ -85,7 +86,7 @@ Even an unbounded solver marker remains UNKNOWN pending scope/model review.
 Malformed receipts cannot unlock a dependent check or authorize execution.
 """
  if (not isinstance(task,dict) or task.get('schema')!='verieda.verification-task.v1'
-     or task.get('kind')!='FORMAL_SYNTHESIS' or task.get('cap_seconds')!=CAP_SECONDS
+     or task.get('kind') not in ('FORMAL_SYNTHESIS','FORMAL_FINAL') or task.get('cap_seconds')!=CAP_SECONDS
      or task.get('task_id')!=digest({k:v for k,v in task.items() if k!='task_id'})):
   raise ValueError('invalid or mutated verifier task')
  if not _hex(expected_sha256):raise ValueError('verifier archive requires caller-trusted SHA256')
@@ -122,6 +123,9 @@ are conservative admission limits, not predicted runtime or quantified benefit.
    {'kind':'FINAL_ACCEPTANCE','requires':['PHYSICAL_FINAL'],'checks':['unbounded Formal on actual final netlist','setup/hold STA with parasitics','constraint semantics and coverage','GDS read and routing DRC']},
    {'kind':'ADOPTION','requires':['FINAL_ACCEPTANCE'],'checks':['independent full-flow receipt','same protected experiment/contract','real WNS gain and nonnegative slack','area overhead at most 10 percent']}],
   'reuse_limit':'synthesis ODB has no routed parasitics; historical final STA/proof cannot validate the new candidate'}
+ if subject['execution_scope']=='PHYSICAL_FINAL':
+  plan['rationale']='prove the actual final physical netlist afresh; synthesis proof cannot be transferred'
+  plan['downstream_checks']=plan['downstream_checks'][1:]
  if formal_result is not None or formal_sha256 is not None:
   try:
    obs=observe_verification(task,formal_result,formal_sha256);plan['observation']=obs
@@ -185,6 +189,52 @@ def verify_verification_package(directory):
  return {'input_gate':'PASS','subject_id':subject['subject_id'],'task_id':manifest['task_id'],
   'execution_authorized':False,'ready_for_cloud_execution':False,'trust':'internal consistency; caller must authenticate source archive separately'}
 
+def _registered_formal_review(subject,archive_sha256):
+ """Explicit source-controlled reviewed facts, not producer/agent verdicts."""
+ root=pathlib.Path(__file__).resolve().parents[1]
+ manifest=read_json(root/'acceptance/PACKAGE_SHA256.json')['files'];matches=[]
+ for name,expected in manifest.items():
+  if not (name.startswith('cases/') and name.endswith('.formal-review.json')):continue
+  raw=(root/name).read_bytes()
+  if _sha(raw)!=expected:raise ValueError('registered proof review source changed')
+  r=read_json(root/name)
+  if r.get('subject_id')!=subject['subject_id'] or r.get('archive_sha256')!=archive_sha256:continue
+  if (r.get('schema')!='verieda.reviewed-formal.v1' or r.get('execution_scope')!=subject['execution_scope']
+      or r.get('verdict')!='PASS_RESET_CONTRACT_UNBOUNDED' or r.get('netlist_sha256')!=subject['target']['netlist_sha256']
+      or r.get('candidate_id')!=subject['candidate_id'] or r.get('engine_sha256')!=_formal_task(subject)['inputs']['engine_sha256']):raise ValueError('review differs from subject/engine/scope')
+  matches.append({'file':name,'sha256':expected,'verdict':r['verdict'],'trust':r['trust'],'limits':r['limits']})
+ if len(matches)>1:raise ValueError('ambiguous registered proof reviews')
+ return matches[0] if matches else None
+
+
+def prepare_final_verification(subject,final_directory,output):
+ """Fresh final-netlist proof request; never relabel a synthesis proof."""
+ _validate(subject)
+ if subject['execution_scope']!='SYNTHESIS_ONLY':raise ValueError('synthesis parent required')
+ source=_unlinked(final_directory);out=_unlinked(output)
+ if out.exists():raise ValueError('final proof output already exists')
+ blobs={}
+ for n in ('6_final.v','6_final.odb','physical-receipt.json'):
+  p=_unlinked(source/n)
+  if not p.is_file() or not 0<p.stat().st_size<=16*1024*1024:raise ValueError('invalid final proof input size')
+  blobs[n]=p.read_bytes()
+ receipt=_obj(blobs,'physical-receipt.json')
+ if (receipt.get('candidate_id')!=subject['candidate_id'] or receipt.get('parent_subject_id')!=subject['subject_id']
+     or type(receipt.get('return_code')) is not int or receipt['return_code']!=0 or receipt.get('phase')!='PHYSICAL_FINAL_OUTPUTS'
+     or receipt.get('netlist_sha256')!=_sha(blobs['6_final.v']) or receipt.get('odb_sha256')!=_sha(blobs['6_final.odb'])):raise ValueError('final physical input/receipt mismatch')
+ final=copy.deepcopy(subject);final.update(execution_scope='PHYSICAL_FINAL',parent_subject_id=subject['subject_id'],
+   physical_receipt_sha256=_sha(blobs['physical-receipt.json']),target={'netlist_sha256':_sha(blobs['6_final.v']),'odb_sha256':_sha(blobs['6_final.odb'])})
+ final.pop('subject_id');final['subject_id']=digest(final);plan=plan_verification(final,300)
+ payload={'subject.json':(json.dumps(final,indent=2)+'\n').encode(),'plan.json':(json.dumps(plan,indent=2)+'\n').encode(),
+          'candidate.v':blobs['6_final.v'],'candidate.odb':blobs['6_final.odb']}
+ m={'schema':'verieda.verification-package.v1','subject_id':final['subject_id'],'task_id':plan['next_check']['task_id'],
+    'files':{n:_sha(b) for n,b in payload.items()},'execution_status':'NOT_RUN','ready_for_cloud_execution':False}
+ out.mkdir(parents=True)
+ for n,b in {**payload,'manifest.json':(json.dumps(m,indent=2)+'\n').encode()}.items():
+  with (out/n).open('xb') as f:f.write(b)
+ return verify_verification_package(out)
+
+
 def review_candidate(state,artifact,expected_sha256,budget_seconds=0,formal_result=None,formal_sha256=None,after_state=None,verification_package=None,formal_contract=None):
  """Candidate lifecycle. A candidate hold never writes the project Goal state.
 
@@ -211,6 +261,14 @@ def review_candidate(state,artifact,expected_sha256,budget_seconds=0,formal_resu
   if review.get('subject_id')!=subject['subject_id'] or review['scope_structure_gate']!='PASS_STATIC_CHECKS':
    result.update(candidate_status='EVIDENCE_HOLD',operation_status='NOT_SCHEDULED',scope_join_issue='scope evidence invalid or foreign to the current candidate')
    result['lifecycle_id']=digest(result);return result
+  registered=_registered_formal_review(subject,formal_sha256)
+  if registered and plan['decision']=='REVIEW_FORMAL_SCOPE':
+   result['reviewed_formal']=registered
+   plan['gates']['formal']=registered['verdict'];plan['decision']='PREPARE_PHYSICAL_CHECK' if budget_seconds>=560 else 'STOP_BUDGET'
+   plan['budget'].update(next_check_cap_seconds=560,additional_final_formal_cap_seconds=300,proposed_job_cap_seconds=1200)
+   plan.pop('plan_id');plan['plan_id']=digest(plan)
+   result.update(candidate_status='READY_FOR_PHYSICAL' if budget_seconds>=560 else 'STOPPED_FOR_BUDGET',
+                 operation_status='WAITING_FOR_AUTHORIZATION' if budget_seconds>=560 else 'NOT_SCHEDULED')
  if after_state is not None:
   from .adoption import evaluate
   data=read_bundle(artifact);verify_bundle(data)
