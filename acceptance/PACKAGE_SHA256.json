@@ -66,7 +66,8 @@
     "verieda/sta_min.py": "f106d28cf6f9dc3250ce1395ca7cb0a7f860e8ec04559d9c95460d0bdf1f09a8",
     "tests/test_constraints.py": "d71a8f77945b9c39c5554f6aad62e07db9dddb5daecd3ebc85b21e44b359be5e",
     "cases/gcd-speed.formal-review.json": "c9b01a54f371f0df5dcc586d48fc8a9e8e5cbca3aff15a49788671891c44de95",
-    ".github/workflows/verieda_candidate_physical.yml": "54e8df8ebed31b68f5418538ff7bea684ffde0afaedda8f44ceaf70e305410ec"
+    ".github/workflows/verieda_candidate_physical.yml": "54e8df8ebed31b68f5418538ff7bea684ffde0afaedda8f44ceaf70e305410ec",
+    "cases/.gitattributes": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9"
   },
   "scope": "existing final netlist only; no physical optimization; no baseline promotion",
   "authorization_boundary": "Integrity manifest only; this file does not authorize push or dispatch."

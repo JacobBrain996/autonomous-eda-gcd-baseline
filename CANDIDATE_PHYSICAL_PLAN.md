@@ -102,7 +102,7 @@ result or candidate optimization success is claimed here.
 Offline: 261 tests, 260 pass, 1 Linux integration skip; YAML/actionlint, all workflow
 Bash blocks and embedded Python, Python AST, Tcl grouping, source package hashes
 and git diff checks pass. Real frozen Linux/OpenROAD/hold/physical-to-final-Formal
-integration remains NOT_RUN. Source pins grew to 65 files (bounded maximum 80);
+integration remains NOT_RUN. Source pins grew to 66 files (bounded maximum 80);
 no source pin was dropped. Immutable Run1, Smoke, synthesis and current proof ZIP
 hashes were checked from actual files. Check details are retained in the local
 scratch validation record (excluded from publication). No independent code-review
