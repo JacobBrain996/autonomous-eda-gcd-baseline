@@ -26,6 +26,36 @@ class ExecutionTests(unittest.TestCase):
             with self.assertRaises(ValueError):verify_package(out)
         bad=copy.deepcopy(self.candidate);bad['changes']={'CLOCK_PERIOD':1}
         with tempfile.TemporaryDirectory() as tmp,self.assertRaises(ValueError):prepare_action(self.state,bad,pathlib.Path(tmp)/'bundle')
+    def test_shared_layout_preserves_historical_gcd_outputs_and_command(self):
+        from verieda.execution import design_paths,expected_effective,EXPECTED_EFFECTIVE
+        from verieda.action_results import inspect_action
+        from test_verification import RESULT,RESULT_SHA
+        paths=design_paths('gcd','nangate45')
+        self.assertEqual(paths['netlist'],'results/nangate45/gcd/verieda/1_2_yosys.v')
+        self.assertEqual(paths['odb'],'results/nangate45/gcd/verieda/1_synth.odb')
+        obs=inspect_action(RESULT,RESULT_SHA);self.assertFalse(obs['issues'])
+        argv=obs['executed_argv']
+        self.assertEqual(make_argv(argv[5],argv[7].split('=',1)[1],argv[-1]),argv)
+        self.assertEqual(expected_effective('gcd','nangate45'),EXPECTED_EFFECTIVE)
+    def test_other_single_file_layout_is_only_a_path_capability_not_admission(self):
+        from verieda.execution import design_paths,expected_effective
+        paths=design_paths('counter','example45')
+        self.assertEqual(paths['rtl'],'flow/designs/src/counter/counter.v')
+        self.assertEqual(paths['sdc'],'flow/designs/example45/counter/constraint.sdc')
+        argv=make_argv('/package/effective.mk','/work/action','synth','counter','example45')
+        self.assertIn('DESIGN_CONFIG=./designs/example45/counter/config.mk',argv)
+        self.assertIn(b'DESIGN_NAME=counter',expected_effective('counter','example45'))
+        state=copy.deepcopy(self.state);state['design']='counter';state['platform']='example45'
+        from verieda.case import digest
+        state['state_id']=digest({k:v for k,v in state.items() if k!='state_id'})
+        candidate=propose(state,600)['selected_candidate']
+        with tempfile.TemporaryDirectory() as tmp,self.assertRaises(ValueError):
+            prepare_action(state,candidate,pathlib.Path(tmp)/'package')
+    def test_layout_rejects_injection_traversal_and_ambiguous_names(self):
+        from verieda.execution import design_paths
+        for bad in ('../gcd','a/b','$(shell x)','a;exec','a b','a\\b','',None,True,'x'*65):
+            with self.subTest(bad=bad),self.assertRaises(ValueError):design_paths(bad,'nangate45')
+            with self.subTest(platform=bad),self.assertRaises(ValueError):design_paths('gcd',bad)
     def test_only_fixed_make_scope_and_no_host_environment_leak(self):
         args=make_argv('/bundle/effective.mk','/work/candidate','synth')
         self.assertIn('ABC_AREA=0',args);self.assertIn('LEC_CHECK=1',args);self.assertIn('SEC_CHECK=1',args)

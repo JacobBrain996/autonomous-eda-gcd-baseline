@@ -252,3 +252,28 @@ History checkpoint: 236 offline tests, 235 passed and one Linux-only test skippe
 New coverage includes actual artifact cost/identity, duplicate and conflicting
 references, budget admission boundary, directory rejection and CLI/API parity.
 No new EDA run or proof result was generated.
+
+
+## Shared ORFS layout boundary
+
+`verieda.execution.design_paths(design, platform_name)` now supplies the single-file
+ORFS convention used by native command generation, source identity checks,
+output sealing, historical receipt inspection and candidate verification packing.
+`expected_effective` provides the matching checked Make output. Strict bounded
+ASCII names reject traversal and Make/shell metacharacters. Historical GCD argv,
+paths, effective-variable bytes and verifier subject/task identities remain
+compatible; old archived source identities are retained rather than rewritten.
+The NETLIST/ODB/OUTPUTS and EXPECTED_EFFECTIVE aliases keep their GCD defaults.
+
+This is a reusable path capability, not another registered execution backend.
+`prepare-action` still admits only the audited GCD/Nangate45 source/tool/image
+combination. A synthetic counter layout test checks conventions and verifies that
+its preparation remains rejected. Multi-file RTL, different source/top naming or
+nonstandard directories need an explicit future descriptor and source identity
+review, not guessed paths. No second RTL execution/proof is claimed.
+
+Offline checkpoint: 239 tests, 238 passed and one existing Linux integration
+skipped on Windows. Regression also preserved structured rejection of missing
+package files. Python syntax, source package hashes and diff checks passed.
+Frozen RTL/SDC/ORFS/image, original artifacts and remote state were not modified;
+no push, dispatch or EDA execution occurred.

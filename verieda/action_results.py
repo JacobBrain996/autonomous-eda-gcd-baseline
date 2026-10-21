@@ -2,13 +2,17 @@
 import hashlib,json,math,pathlib,re,zipfile
 from .case import digest
 from .evidence import read_bundle,verify_bundle,object_json
-from .execution import _unlinked,make_argv,EXPECTED_EFFECTIVE
+from .execution import _unlinked,make_argv,design_paths,expected_effective
 
 PREFIX='action/'
-NETLIST='results/nangate45/gcd/verieda/1_2_yosys.v'
-ODB='results/nangate45/gcd/verieda/1_synth.odb'
+NETLIST=design_paths('gcd','nangate45')['netlist']
+ODB=design_paths('gcd','nangate45')['odb']
 PACKAGE=('state.json','candidate.json','manifest.json','effective.mk')
-OUTPUTS=('action-execution.json','launcher-result.json','effective.log','synth.log',NETLIST,ODB)
+def output_names(state):
+    paths=design_paths(state['design'],state['platform'])
+    return ('action-execution.json','launcher-result.json','effective.log','synth.log',paths['netlist'],paths['odb'])
+
+OUTPUTS=output_names({'design':'gcd','platform':'nangate45'})
 
 def _hash(raw):return hashlib.sha256(raw).hexdigest()
 def _obj(data,name):
@@ -41,7 +45,7 @@ def seal_action(package,work,output):
     package=_unlinked(package);work=_unlinked(work);output=_unlinked(output)
     if output.exists():raise ValueError('result destination already exists')
     data={}
-    for folder,names,prefix in ((package,PACKAGE,PREFIX+'package/'),(work,OUTPUTS,PREFIX+'output/')):
+    def collect(folder,names,prefix):
         if not folder.is_dir():raise ValueError('result input directory missing')
         for name in names:
             path=_unlinked(folder/name)
@@ -50,7 +54,9 @@ def seal_action(package,work,output):
             raw=path.read_bytes()
             if len(raw)>16*1024*1024:raise ValueError('result grew beyond bound')
             data[prefix+name]=raw
-    _package(data)
+    collect(package,PACKAGE,PREFIX+'package/')
+    _,state,_=_package(data)
+    collect(work,output_names(state),PREFIX+'output/')
     if not any(PREFIX+'output/'+n in data for n in ('action-execution.json','launcher-result.json')):raise ValueError('no action execution or launcher result to seal')
     if sum(map(len,data.values()))>128*1024*1024:raise ValueError('result total byte budget exceeded')
     data['file-sizes.json']=(json.dumps([{'path':n,'bytes':len(b)} for n,b in data.items()],indent=2)+'\n').encode()
@@ -74,9 +80,10 @@ def inspect_action(artifact,expected_sha256=None,expected_candidate=None):
     except (OSError,ValueError,KeyError,TypeError,UnicodeError,RecursionError,zipfile.BadZipFile) as ex:
         result['evidence_gate']='FAIL';result['issues'].append(str(ex));return result
     try:
-        allowed={PREFIX+'package/'+n for n in PACKAGE}|{PREFIX+'output/'+n for n in OUTPUTS}|{'file-sizes.json','SHA256SUMS.txt'}
-        if set(data)-allowed:raise ValueError('unexpected exported result payload')
         manifest,state,candidate=_package(data);cid=candidate['candidate_id']
+        paths=design_paths(state['design'],state['platform'])
+        allowed={PREFIX+'package/'+n for n in PACKAGE}|{PREFIX+'output/'+n for n in output_names(state)}|{'file-sizes.json','SHA256SUMS.txt'}
+        if set(data)-allowed:raise ValueError('unexpected exported result payload')
         result.update(candidate_id=cid,state_id=state['state_id'],phase='SYNTHESIS_ONLY',historical_adapter_sources=manifest['adapter_sources'])
         if expected_candidate and cid!=expected_candidate:raise ValueError('expected candidate mismatch')
         receipt_name=PREFIX+'output/action-execution.json'
@@ -93,15 +100,15 @@ def inspect_action(artifact,expected_sha256=None,expected_candidate=None):
         if (receipt.get('schema')!='verieda.action-execution.v0' or receipt.get('candidate_id')!=cid
             or receipt.get('state_id')!=state['state_id'] or receipt.get('phase')!='SYNTHESIS_ONLY'
             or digest(receipt.get('changes'))!=digest(candidate['changes'])):raise ValueError('receipt identity/scope mismatch')
-        expected_sources={**manifest['support']['sources'],'flow/designs/src/gcd/gcd.v':state['frozen']['rtl_sha256'],
-                          'flow/designs/nangate45/gcd/constraint.sdc':state['frozen']['sdc_sha256'],**state['tools']}
+        expected_sources={**manifest['support']['sources'],paths['rtl']:state['frozen']['rtl_sha256'],
+                          paths['sdc']:state['frozen']['sdc_sha256'],**state['tools']}
         if receipt.get('source_tool_sha256')!=expected_sources:raise ValueError('frozen source/tool receipt mismatch')
         steps=receipt.get('steps');runtime=receipt.get('runtime_seconds');rc=receipt.get('return_code')
         if not isinstance(steps,list) or not 1<=len(steps)<=2 or not _number(runtime) or runtime>301 or type(rc) is not int:raise ValueError('missing/bounded measured process runtime or return code')
         for i,step in enumerate(steps):
             argv=step['argv'];target='verieda-effective' if i==0 else 'synth';log='effective.log' if i==0 else 'synth.log'
             if not isinstance(argv,list) or len(argv)<8 or not isinstance(argv[7],str) or not argv[7].startswith('WORK_HOME='):raise ValueError('invalid Make argv')
-            if argv!=make_argv(argv[5],argv[7].split('=',1)[1],target):raise ValueError('unexpected process command')
+            if argv!=make_argv(argv[5],argv[7].split('=',1)[1],target,state['design'],state['platform']):raise ValueError('unexpected process command')
             if (type(step.get('return_code')) is not int or type(step.get('timeout')) is not bool
                 or not _number(step.get('runtime_seconds')) or step['runtime_seconds']>301):raise ValueError('invalid process exit/runtime')
             if step['timeout'] and step['return_code']!=124:raise ValueError('per-step timeout/exit contradiction')
@@ -113,7 +120,7 @@ def inspect_action(artifact,expected_sha256=None,expected_candidate=None):
             if _hash(data[PREFIX+'output/'+log])!=step['log_sha256']:raise ValueError('raw process log hash mismatch')
         if runtime+1e-3<sum(s['runtime_seconds'] for s in steps) or rc!=steps[-1]['return_code']:raise ValueError('inconsistent total runtime/return code')
         if len(steps)==2 and (steps[0]['return_code']!=0 or steps[0]['timeout']):raise ValueError('synthesis ran after failed effective-variable check')
-        if len(steps)==2 and data[PREFIX+'output/effective.log']!=EXPECTED_EFFECTIVE:raise ValueError('synthesis ran without exact effective variables')
+        if len(steps)==2 and data[PREFIX+'output/effective.log']!=expected_effective(state['design'],state['platform']):raise ValueError('synthesis ran without exact effective variables')
         last=steps[-1];status=receipt.get('status')
         if last['timeout']:
             if rc!=124 or status!='TIMEOUT':raise ValueError('timeout status contradiction')
@@ -126,7 +133,7 @@ def inspect_action(artifact,expected_sha256=None,expected_candidate=None):
             observed='ERROR';outcome='ERROR';next_action='inspect_saved_tool_failure'
         elif status=='SYNTHESIS_COMPLETED':
             if len(steps)!=2:raise ValueError('completed synthesis without two observed steps')
-            for field,name in [('netlist',NETLIST),('odb',ODB)]:
+            for field,name in [('netlist',paths['netlist']),('odb',paths['odb'])]:
                 raw=data.get(PREFIX+'output/'+name,b'')
                 if not raw or receipt.get(field+'_path')!=name or _hash(raw)!=receipt.get(field+'_sha256'):raise ValueError('missing or mismatched completed synthesis output')
             if b'Using ABC speed script.' not in data[PREFIX+'output/synth.log']:raise ValueError('speed mapping not observed in raw log')

@@ -8,9 +8,28 @@ EFFECTIVE=b'''.PHONY: verieda-effective
 verieda-effective:
 \t@printf 'ABC_AREA=%s\\nLEC_CHECK=%s\\nSEC_CHECK=%s\\nPLATFORM=%s\\nDESIGN_NAME=%s\\nYOSYS_EXE=%s\\nOPENROAD_EXE=%s\\nPYTHON_EXE=%s\\n' '$(ABC_AREA)' '$(LEC_CHECK)' '$(SEC_CHECK)' '$(PLATFORM)' '$(DESIGN_NAME)' '$(YOSYS_EXE)' '$(OPENROAD_EXE)' '$(PYTHON_EXE)'
 '''
-EXPECTED_EFFECTIVE=(b'ABC_AREA=0\nLEC_CHECK=1\nSEC_CHECK=1\nPLATFORM=nangate45\nDESIGN_NAME=gcd\n'
-                    b'YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys\n'
-                    b'OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad\nPYTHON_EXE=/usr/bin/python3\n')
+def design_paths(design,platform_name):
+    """Pure single-file ORFS convention, not a support/authorization decision.
+
+    Multi-file RTL and nonstandard layouts need an explicit future descriptor;
+    never infer their input identity from these conventional names.
+    """
+    for name in (design,platform_name):
+        if not isinstance(name,str) or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_-]{0,63}',name):raise ValueError('unsafe ORFS design/platform name')
+    base=f'{platform_name}/{design}'
+    return {'config':f'designs/{base}/config.mk','rtl':f'flow/designs/src/{design}/{design}.v',
+            'sdc':f'flow/designs/{base}/constraint.sdc',
+            'netlist':f'results/{base}/verieda/1_2_yosys.v','odb':f'results/{base}/verieda/1_synth.odb'}
+
+
+def expected_effective(design,platform_name):
+    design_paths(design,platform_name)
+    return (f'ABC_AREA=0\nLEC_CHECK=1\nSEC_CHECK=1\nPLATFORM={platform_name}\nDESIGN_NAME={design}\n'
+            'YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys\n'
+            'OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad\nPYTHON_EXE=/usr/bin/python3\n').encode()
+
+# Backwards-compatible names for the registered historical GCD adapter.
+EXPECTED_EFFECTIVE=expected_effective('gcd','nangate45')
 
 def _sha(path):return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
 def _json_bytes(obj):return (json.dumps(obj,sort_keys=True,indent=2,allow_nan=False)+'\n').encode()
@@ -54,11 +73,11 @@ def _posix_path(value):
     if not re.fullmatch(r'/[A-Za-z0-9_./-]+',text) or '..' in pathlib.PurePosixPath(text).parts:raise ValueError('unsafe native Make path')
     return text
 
-def make_argv(effective,work,target):
+def make_argv(effective,work,target,design='gcd',platform_name='nangate45'):
     if target not in ('verieda-effective','synth'):raise ValueError('unsupported Make target')
-    effective=_posix_path(effective);work=_posix_path(work)
+    effective=_posix_path(effective);work=_posix_path(work);paths=design_paths(design,platform_name)
     return ['/usr/bin/make','--no-print-directory','-f','Makefile','-f',effective,
-            'DESIGN_CONFIG=./designs/nangate45/gcd/config.mk','WORK_HOME='+work,'FLOW_VARIANT=verieda',
+            'DESIGN_CONFIG=./'+paths['config'],'WORK_HOME='+work,'FLOW_VARIANT=verieda',
             'ABC_AREA=0','LEC_CHECK=1','SEC_CHECK=1',
             'YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys',
             'OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad','PYTHON_EXE=/usr/bin/python3',target]
@@ -108,8 +127,8 @@ def _native_identity(root,state,manifest):
     for name,h in manifest['support']['sources'].items():
         hashes[name]=_sha(root/name)
         if hashes[name]!=h:raise ValueError('frozen action source mismatch: '+name)
-    sources={'flow/designs/src/gcd/gcd.v':state['frozen']['rtl_sha256'],
-             'flow/designs/nangate45/gcd/constraint.sdc':state['frozen']['sdc_sha256']}
+    paths=design_paths(state['design'],state['platform'])
+    sources={paths['rtl']:state['frozen']['rtl_sha256'],paths['sdc']:state['frozen']['sdc_sha256']}
     for name,h in {**sources,**state['tools']}.items():
         p=pathlib.Path(name) if name.startswith('/') else root/name
         hashes[name]=_sha(p)
@@ -125,6 +144,7 @@ def execute_action(package,frozen_root,work,execute=False,image_record=None):
     root=_unlinked(frozen_root);bundle=_unlinked(package);out=_unlinked(work);_posix_path(out)
     if out.exists() or out.is_relative_to(root) or root.is_relative_to(out) or out.is_relative_to(bundle) or bundle.is_relative_to(out):raise ValueError('fresh output outside frozen source/package required')
     state=read_json(bundle/'state.json',4*1024*1024);candidate=read_json(bundle/'candidate.json')
+    paths=design_paths(state['design'],state['platform'])
     identity=_native_identity(root,state,manifest)
     out.mkdir();(out/'tmp').mkdir();start=time.monotonic();env=clean_environment(out)
     receipt={'schema':'verieda.action-execution.v0','state_id':state['state_id'],'candidate_id':candidate['candidate_id'],
@@ -132,24 +152,24 @@ def execute_action(package,frozen_root,work,execute=False,image_record=None):
              'source_tool_sha256':identity,'design_acceptance':'NOT_EVALUATED','FORMAL_EQUIVALENCE_GATE':'NOT_RUN',
              'TIMING_GATE':'NOT_RUN','image_host_record':image,'OCI_IDENTITY_GATE':'HOST_RECORD_MATCH_NOT_ATTESTED'}
     try:
-        pre=_run(make_argv(bundle/'effective.mk',out,'verieda-effective'),root/'flow',env,out/'effective.log',20)
+        pre=_run(make_argv(bundle/'effective.mk',out,'verieda-effective',state['design'],state['platform']),root/'flow',env,out/'effective.log',20)
         receipt['steps'].append(pre);receipt['return_code']=pre['return_code']
         if pre['return_code']!=0:receipt['status']='TIMEOUT' if pre['timeout'] else 'ERROR'
-        elif (out/'effective.log').read_bytes()!=EXPECTED_EFFECTIVE:receipt['status']='HOLD_EFFECTIVE_VARIABLES'
+        elif (out/'effective.log').read_bytes()!=expected_effective(state['design'],state['platform']):receipt['status']='HOLD_EFFECTIVE_VARIABLES'
         else:
             remaining=300-(time.monotonic()-start)
             if remaining<=0:receipt.update(status='TIMEOUT',return_code=124)
             else:
-                run=_run(make_argv(bundle/'effective.mk',out,'synth'),root/'flow',env,out/'synth.log',remaining)
+                run=_run(make_argv(bundle/'effective.mk',out,'synth',state['design'],state['platform']),root/'flow',env,out/'synth.log',remaining)
                 receipt['steps'].append(run);receipt['return_code']=run['return_code']
-                netlist=out/'results/nangate45/gcd/verieda/1_2_yosys.v'
-                odb=out/'results/nangate45/gcd/verieda/1_synth.odb'
+                netlist=out/paths['netlist']
+                odb=out/paths['odb']
                 if run['return_code']!=0:receipt['status']='TIMEOUT' if run['timeout'] else 'ERROR'
                 elif not netlist.is_file() or not 0<netlist.stat().st_size<=16*1024*1024:receipt['status']='HOLD_MISSING_NETLIST'
                 elif not odb.is_file() or not 0<odb.stat().st_size<=16*1024*1024:receipt['status']='HOLD_MISSING_ODB'
                 elif 'Using ABC speed script.' not in (out/'synth.log').read_text(errors='replace'):receipt['status']='HOLD_MAPPING_NOT_OBSERVED'
-                else:receipt.update(status='SYNTHESIS_COMPLETED',netlist_sha256=_sha(netlist),netlist_path='results/nangate45/gcd/verieda/1_2_yosys.v',
-                                    odb_sha256=_sha(odb),odb_path='results/nangate45/gcd/verieda/1_synth.odb')
+                else:receipt.update(status='SYNTHESIS_COMPLETED',netlist_sha256=_sha(netlist),netlist_path=paths['netlist'],
+                                    odb_sha256=_sha(odb),odb_path=paths['odb'])
     except (OSError,ValueError,subprocess.SubprocessError) as ex:receipt.update(status='ERROR',error=str(ex))
     receipt['runtime_seconds']=time.monotonic()-start
     with (out/'action-execution.json').open('xb') as f:f.write(_json_bytes(receipt))

@@ -6,10 +6,10 @@ adapter. Result archives are observations, not certified proof receipts.
 import copy,hashlib,json,math,pathlib,re,zipfile
 from .case import digest
 from .policy import _bound_state,validate_candidate
-from .action_results import inspect_action,NETLIST,ODB
+from .action_results import inspect_action
 from .evidence import read_bundle,verify_bundle,object_json
 from .formal import observe_yosys
-from .execution import _unlinked
+from .execution import _unlinked,design_paths
 
 CAP_SECONDS=300
 
@@ -34,11 +34,12 @@ def load_subject(state,artifact,expected_sha256):
  manifest=_obj(data,'action/package/manifest.json')
  libraries={k:v for k,v in manifest['support']['sources'].items() if k.endswith('.lib')}
  if len(libraries)!=1:raise ValueError('single identified functional source library required')
+ paths=design_paths(state['design'],state['platform'])
  subject={'schema':'verieda.verification-subject.v1','design':state['design'],'platform':state['platform'],
   'candidate_id':candidate['candidate_id'],'state_id':state['state_id'],'artifact_sha256':expected_sha256,
   'frozen':copy.deepcopy(state['frozen']),'tools':copy.deepcopy(state['tools']),
   'library':libraries,'formal_contract':state.get('formal',{}).get('contract'),
-  'target':{'netlist_sha256':_sha(data['action/output/'+NETLIST]),'odb_sha256':_sha(data['action/output/'+ODB])},
+  'target':{'netlist_sha256':_sha(data['action/output/'+paths['netlist']]),'odb_sha256':_sha(data['action/output/'+paths['odb']])},
   'reference':{'netlist_sha256':state['inputs']['6_final.v'],'formal_gate':state['gates'].get('formal','UNKNOWN')},
   'execution_scope':'SYNTHESIS_ONLY','external_identity':'caller-trusted archive digest; no remote attestation'}
  subject['subject_id']=digest(subject);return subject
@@ -142,10 +143,11 @@ def prepare_verification(state,artifact,expected_sha256,output,budget_seconds=0)
  subject=load_subject(state,artifact,expected_sha256);plan=plan_verification(subject,budget_seconds)
  if plan['next_check'] is None:raise ValueError('no eligible verification preparation: '+plan['decision'])
  data=read_bundle(artifact);verify_bundle(data)
+ paths=design_paths(state['design'],state['platform'])
  if _sha(pathlib.Path(artifact).read_bytes())!=expected_sha256:raise ValueError('result changed during materialization')
  payload={'subject.json':(json.dumps(subject,indent=2)+'\n').encode(),
   'plan.json':(json.dumps(plan,indent=2)+'\n').encode(),
-  'candidate.v':data['action/output/'+NETLIST],'candidate.odb':data['action/output/'+ODB]}
+  'candidate.v':data['action/output/'+paths['netlist']],'candidate.odb':data['action/output/'+paths['odb']]}
  if _sha(payload['candidate.v'])!=subject['target']['netlist_sha256'] or _sha(payload['candidate.odb'])!=subject['target']['odb_sha256']:raise ValueError('materialized candidate mismatch')
  out=_unlinked(output)
  if out.exists():raise ValueError('verification output already exists')
