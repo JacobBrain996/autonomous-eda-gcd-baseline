@@ -159,3 +159,53 @@ Native verifier source uses acceptance/.gitattributes to pin LF within that dire
 This interface does not authenticate a GitHub run merely because execution-source.json names one, even with a trusted archive digest. It does not independently validate the exact proof property, functional model, reset contract or witness. Formal and complete constraints cannot receive PASS here; positive setup alone cannot establish hold/coverage acceptance. The existing native package and an external run/commit binding remain prerequisites for future certified ingestion.
 
 Exit 0 means observation completed, not design accepted. Exit 2 means input/integrity failure. Tests use synthetic bundles, not new EDA results. Current offline suite: 96 tests, 95 passed, one existing Linux native-signal test skipped on Windows. The native package source manifest includes the new adapter/CLI/test bindings. The real Smoke ZIP and its existing CLI results were rechecked unchanged: timing FAIL, formal NOT_RUN, acceptance NOT_ACCEPTED. No workflow, physical input, cloud authority or remote branch changed.
+
+
+## Unified offline decision
+
+`python -m verieda decide` joins the existing reference, candidate and optional
+Formal evidence into one auditable next action. It never executes EDA or grants
+permission. Example using retained real evidence (PowerShell, repository root):
+
+```powershell
+python -m verieda decide --profile cases/gcd.json `
+ --smoke evidence/smoke-9644bb3f8ed4/NO_LEC_SMOKE-38226418563.zip `
+ --acceptance evidence/final-acceptance-bbf5c1de8b7c/acceptance-39544704950.zip `
+ --budget-seconds 300 `
+ --result evidence/verieda-action-ed5d84b9bdf7/result.zip `
+ --expected-sha256 15ad5d562b81007dc4364dd4a5320890f7160adcfaf893e8aa14308f968f7bf3 `
+ --formal-result evidence/candidate-formal-9a84b59a1c60/verifier-result.zip `
+ --formal-sha256 98f42872720c8fe0b73492ef8766f3b966725c049507975f9b58c6799e2511f7
+```
+
+This case returns REVIEW_TOOL_FAILURE / CANDIDATE_TOOL_BLOCKED, with proof not
+started. It does not reject the design or block the project. Without Formal
+inputs it requests candidate verification; without candidate inputs it proposes
+from the reference (mapping requires a 600-second cap). Always supply the latest
+known candidate: this is a supplied-evidence snapshot, not a scheduler or global
+inventory. Pending/failed candidate evidence never falls back to another mapping.
+Exit 2 means evidence HOLD; exit 0 means analysis completed, not design PASS.
+
+Optional --verification-package and --formal-contract reuse static proof-scope
+review. --after-profile / --after-smoke / --after-acceptance load independent final
+evidence and delegate accept/reject/continue to the existing full-flow predicate.
+The CLI takes no raw agent verdict. Invalid/contradictory Formal evidence HOLDs
+before adoption. Counterexample, timeout, unknown and tool errors remain distinct.
+Synthesis success cannot satisfy final Formal, timing, DRC or constraint checks.
+
+JSON binds reference provenance, decision-entrypoint/source-manifest hashes and
+complete decision content. Hashes support replay, not attestation. Budget means
+caller-supplied remaining native time; setup/queue/billing, monetary cost and
+expected gain are not inferred. No reservation or retry occurs. Synthetic
+cross-design tests do not establish a second real RTL flow. This deterministic
+V0 integration does not demonstrate LLM optimization ability.
+
+
+Local integration checkpoint: 232 offline tests, 231 passed and one existing
+Linux-only integration skipped on Windows. Nine new tests cover real retained
+reference/candidate/native-failure evidence, CLI/API parity, budget/identity
+holds and synthetic final accept/reject/continue outcomes. A re-sealed native
+archive with the wrong task ID reproduced a lifecycle override defect: final
+state evaluation could overwrite HOLD_VERIFIER_EVIDENCE. The shared lifecycle
+now returns that HOLD before considering final adoption. Original ZIPs remain
+unchanged. No repaired native Formal run, push or dispatch occurred.

@@ -199,6 +199,8 @@ def review_candidate(state,artifact,expected_sha256,budget_seconds=0,formal_resu
   'candidate_status':statuses[plan['decision']],'verification':plan,'adoption':None,
   'operation_status':'WAITING_FOR_AUTHORIZATION' if plan['next_check'] else 'NOT_SCHEDULED',
   'block_scope':'CANDIDATE_ONLY','execution_authorized':False,'design_acceptance':'NOT_EVALUATED'}
+ if plan['decision']=='HOLD_VERIFIER_EVIDENCE':
+  result['lifecycle_id']=digest(result);return result
  if verification_package is not None or formal_contract is not None:
   if verification_package is None or formal_contract is None or formal_result is None or formal_sha256 is None:raise ValueError('scope review requires package, contract and bound Formal archive')
   from .formal_review import inspect_formal

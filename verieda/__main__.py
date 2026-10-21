@@ -13,6 +13,7 @@ from .verification import load_subject,plan_verification,prepare_verification,ve
 from .formal_runtime import execute_formal
 from .formal_review import inspect_formal
 from .triage import diagnose
+from .decision import decide
 
 def read(path,limit):
     p=Path(path)
@@ -34,6 +35,11 @@ def main():
     p.add_argument('reference');p.add_argument('candidate')
     p=sub.add_parser('observe-formal',help='classify a log; does not certify proof or witness')
     p.add_argument('log');p.add_argument('--return-code',required=True,type=int)
+    p=sub.add_parser('decide',help='join reference, candidate and verification evidence into one offline next action; never executes')
+    for part in ('profile','smoke','acceptance'):p.add_argument('--'+part,required=True)
+    p.add_argument('--budget-seconds',type=int,default=0,help='remaining native budget, excludes setup/billing')
+    for part in ('result','expected-sha256','formal-result','formal-sha256','verification-package','formal-contract'):p.add_argument('--'+part)
+    for part in ('profile','smoke','acceptance'):p.add_argument('--after-'+part)
     p=sub.add_parser('plan',help='load pinned evidence and propose legal bounded actions; no execution')
     p.add_argument('--profile',required=True);p.add_argument('--smoke',required=True);p.add_argument('--acceptance',required=True)
     p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
@@ -72,7 +78,14 @@ def main():
     p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
     args=parser.parse_args()
     try:
-        if args.command=='diagnose':
+        if args.command=='decide':
+            case=load_case(read_json(args.profile),args.smoke,args.acceptance)
+            after_args=(args.after_profile,args.after_smoke,args.after_acceptance)
+            if any(after_args) and not all(after_args):raise ValueError('complete after profile/Smoke/acceptance inputs required')
+            after=load_case(read_json(args.after_profile),args.after_smoke,args.after_acceptance) if all(after_args) else None
+            state=decide(case,args.budget_seconds,args.result,args.expected_sha256,args.formal_result,args.formal_sha256,args.verification_package,args.formal_contract,after)
+            rc=2 if state['next_action']=='HOLD_EVIDENCE' else 0
+        elif args.command=='diagnose':
             state=diagnose(args.artifact,args.expected_sha256)
             rc=0 if state['evidence_gate']=='PASS' and state['analysis_gate']=='PASS' else 2
         elif args.command=='inspect-formal':
