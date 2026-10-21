@@ -16,7 +16,13 @@ if {$role eq "reference"} {
   read_sdc /inputs/6_final.sdc
 }
 write_sdc -no_timestamp $out/evaluated.sdc
-report_units > $out/units.rpt
+# Capture via process stdout; this command has no portable > argument.
+puts "VERIEDA_REPORT_BEGIN units"
+flush stdout
+report_units
+flush stdout
+puts "VERIEDA_REPORT_END units"
+flush stdout
 check_setup -verbose > $out/coverage.rpt
 set f [open $out/ports.tsv w]
 foreach term [[ord::get_db_block] getBTerms] {

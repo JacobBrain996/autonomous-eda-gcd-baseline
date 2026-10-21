@@ -8,6 +8,9 @@ sta_rc=0
 timeout --kill-after=5 60 /OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad \
   -no_init -exit /audit/sta.tcl > /work/sta/tool.log 2>&1 || sta_rc=$?
 if [ "$sta_rc" -eq 0 ]; then
+  python3 /audit/verify.py sta-reports || sta_rc=$?
+fi
+if [ "$sta_rc" -eq 0 ]; then
   python3 /audit/verify.py sta-results || sta_rc=$?
 fi
 formal_rc=0

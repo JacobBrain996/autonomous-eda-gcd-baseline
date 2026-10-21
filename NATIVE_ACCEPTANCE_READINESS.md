@@ -2,6 +2,16 @@
 
 本报告取代早期 FINAL_NETLIST_ACCEPTANCE_PREPARATION.md 的当前就绪结论；旧报告保留历史版本及当时的SHA，不能用它证明修订代码已经过原生验证。
 
+## Adapter repair after Run 39451358576 — local only
+
+The previous native run failed in verifier adapters, before complete STA reporting and before model import/SAT. This revision invokes report_units, report_wns and report_tns with only their documented options and captures their output through fixed begin/end markers in the existing process log. Python rejects missing, duplicate, reordered or empty sections and refuses stale report overwrite; it preserves the printed precision and propagates tool failures. report_checks/check_setup retain their explicitly documented redirection. The capacitance report field now uses its documented full name.
+
+Yosys capability parsing now uses option declarations from the SAT help section, supports comma-grouped declarations, requires exact option tokens and reports missing names. It does not accept prose references or longer similarly named flags. The public fixture is the actual SAT help section (trailing blank lines normalized) from Artifact 12278756960 / Run 39451358576; the original ZIP SHA256 is f93ea8ad7bded676e2cffb3903fb8961726ccec780826eb00e5d46900a8c1152. A fixtures-scoped LF attribute keeps its checksum portable.
+
+Regression tests first reproduced the old report_units argument failure and absent helper behavior, then passed after repair. Current offline suite: 105 tests, 104 passed, one existing Linux signal integration skipped on Windows. Strict report signatures run both full Tcl scripts, with fixed fake database/tool dependencies; this remains a stubbed integration, not native EDA validation. The real Yosys help fixture passes and missing/near-matching/prose options are rejected. Report precision, malformed markers, stale files and native-error propagation are checked.
+
+Frozen ORFS/image, RTL/SDC, complete library requirements, all 18 output bits, reset contract, Formal budget and baseline gates are unchanged. No repair push or new cloud dispatch is authorized by this local revision. Remaining native risks include stdout ordering/capture, remaining OpenROAD APIs/format, full Liberty import and SAT induction convergence; another job must not be presented as guaranteed success. The next proposed experiment is one separately approved identical 10-minute standard public job with Formal capped at 5 minutes, no physical rerun and no automatic retry. Its current package bindings supersede the failed run's hook hashes, not the frozen design/tool identity.
+
 ## 具体拟执行作业（尚未授权、未执行）
 
 `.github/workflows/final_netlist_acceptance.yml`，仅workflow_dispatch，一个标准public ubuntu-24.04 job，10分钟上限。保持ORFS 3a964e13f11a4e435aac01ffa14db0a7d2853720及原OCI digest、GCD RTL、Nangate45和0.25 ns原约束不变；不跑综合/布局/布线/Timing ECO，不调用Kepler，不增加付费资源或自动重试。

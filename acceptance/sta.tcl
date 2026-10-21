@@ -25,13 +25,31 @@ set_extraction_rules_file $platform/rcx_patterns.rules
 extract_parasitics
 write_spef $out/reconstructed.spef
 read_spef $out/reconstructed.spef
-report_units > $out/units.rpt
-report_wns -max -digits 9 > $out/wns.rpt
-report_tns -max -digits 9 > $out/tns.rpt
+# Capture via process stdout; this command has no portable > argument.
+puts "VERIEDA_REPORT_BEGIN units"
+flush stdout
+report_units
+flush stdout
+puts "VERIEDA_REPORT_END units"
+flush stdout
+# Capture via process stdout; this command has no portable > argument.
+puts "VERIEDA_REPORT_BEGIN wns"
+flush stdout
+report_wns -max -digits 9
+flush stdout
+puts "VERIEDA_REPORT_END wns"
+flush stdout
+# Capture via process stdout; this command has no portable > argument.
+puts "VERIEDA_REPORT_BEGIN tns"
+flush stdout
+report_tns -max -digits 9
+flush stdout
+puts "VERIEDA_REPORT_END tns"
+flush stdout
 report_checks -path_delay max -group_path_count 10000 -endpoint_path_count 1 \
   -slack_max 0 -sort_by_slack -no_line_splits -format full_clock_expanded \
-  -fields {fanout cap slew input_pin net} -digits 9 > $out/all_setup.rpt
+  -fields {fanout capacitance slew input_pin net} -digits 9 > $out/all_setup.rpt
 report_checks -path_delay max -group_path_count 20 -endpoint_path_count 1 \
   -sort_by_slack -no_line_splits -format full_clock_expanded \
-  -fields {fanout cap slew input_pin net} -digits 9 > $out/top_setup.rpt
+  -fields {fanout capacitance slew input_pin net} -digits 9 > $out/top_setup.rpt
 check_setup -verbose > $out/coverage.rpt

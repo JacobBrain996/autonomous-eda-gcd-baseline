@@ -107,6 +107,36 @@ def identity():
         'verieda_modules':{p.name:sha(p) for p in Path('/verieda').glob('*.py')},
         'proof_contract':'two forced synchronous reset edges; every output thereafter; arbitrary future defined inputs',
         'baseline_promoted':False})
+def require_proof_capabilities(text):
+    if 'no such command' in text.lower():raise ValueError('HOLD missing Yosys command')
+    header='    sat [options] [selection]'
+    if text.count(header)!=1:raise ValueError('HOLD missing/ambiguous SAT help section')
+    sat=text.split(header,1)[1]
+    declarations=re.findall(r'(?m)^ {4}(-[A-Za-z0-9_-]+(?:,[ \t]+-[A-Za-z0-9_-]+)*)(?=[ \t]|$)',sat)
+    options={v for declaration in declarations for v in re.findall(r'-[A-Za-z0-9_-]+',declaration)}
+    required={'-seq','-tempinduct','-maxsteps','-prove','-verify','-timeout','-enable_undef','-set-def-inputs','-set-init-def','-dump_json','-show','-show-inputs','-show-regs'}
+    missing=sorted(required-options)
+    if missing:raise ValueError('HOLD missing SAT options: '+', '.join(missing))
+
+def report_sections(text,names):
+    allowed={'units','wns','tns'}
+    if not names or len(set(names))!=len(names) or not set(names)<=allowed:raise ValueError('HOLD invalid report request')
+    markers=list(re.finditer(r'(?m)^VERIEDA_REPORT_(BEGIN|END) ([^\r\n]+)\r?$',text))
+    expected=[(kind,name) for name in names for kind in ('BEGIN','END')]
+    if [m.groups() for m in markers]!=expected:raise ValueError('HOLD missing/duplicate/out-of-order native report markers')
+    reports={}
+    for i,name in enumerate(names):
+        value=text[markers[2*i].end():markers[2*i+1].start()].strip('\r\n')
+        if not value.strip():raise ValueError('HOLD empty native report '+name)
+        reports[name]=value+'\n'
+    return reports
+
+def capture_reports(folder,names):
+    folder=Path(folder)
+    reports=report_sections((folder/'tool.log').read_text(encoding='utf-8'),names)
+    for name,value in reports.items():
+        with (folder/(name+'.rpt')).open('x',encoding='utf-8',newline='\n') as f:f.write(value)
+
 def formal():
     d=Path('/work/formal');d.mkdir(exist_ok=True);started=time.monotonic()
     def budget():
@@ -116,7 +146,8 @@ def formal():
     helpcmd='; '.join('help '+c for c in ['read_liberty','read_verilog','read_rtlil','write_rtlil','write_json','design','hierarchy','proc','flatten','memory_map','opt','dffunmap','opt_clean','rename','check','sat'])
     rc=run([YOSYS,'-Q','-T','-p',helpcmd],d/'capabilities.log',min(15,budget()))
     helptext=(d/'capabilities.log').read_text(errors='replace')
-    if rc or 'No such command' in helptext or any(not re.search(r'(?m)^\s*'+re.escape(k)+r'(?:\s|$)',helptext) for k in ['-seq','-tempinduct','-maxsteps','-prove','-verify','-timeout','-enable_undef','-set-def-inputs','-set-init-def','-dump_json','-show','-show-inputs','-show-regs']):raise ValueError('HOLD Yosys proof capability')
+    if rc:raise ValueError('HOLD Yosys help return code '+str(rc))
+    require_proof_capabilities(helptext)
     lib='/frozen/flow/platforms/nangate45/lib/NangateOpenCellLibrary_typical.lib'
     prep=f'''read_liberty {lib}
 write_json /work/formal/models.json
@@ -230,6 +261,7 @@ def snapshots():
         env=dict(os.environ);env['VERIEDA_SNAPSHOT_ROLE']=role
         rc=run([OPENROAD,'-no_init','-exit','/audit/snapshot.tcl'],folder/'tool.log',20,env=env)
         if rc:raise ValueError('HOLD native constraint snapshot '+role+' rc='+str(rc))
+        capture_reports(folder,['units'])
         for name in ['evaluated.sdc','units.rpt','coverage.rpt','ports.tsv']:
             if not (folder/name).is_file():raise ValueError('HOLD incomplete native snapshot '+role)
         if not (folder/'ports.tsv').stat().st_size:raise ValueError('HOLD empty native port inventory')
@@ -247,13 +279,14 @@ def seal(root):
     files.append(root/'file-sizes.json')
     (root/'SHA256SUMS.txt').write_text(''.join(sha(p)+'  '+p.relative_to(root).as_posix()+'\n' for p in files),encoding='utf-8')
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('mode',choices=['package-check','fetch','identity','formal','sta-results','snapshots','seal']);p.add_argument('directory',nargs='?');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('mode',choices=['package-check','fetch','identity','formal','sta-results','sta-reports','snapshots','seal']);p.add_argument('directory',nargs='?');a=p.parse_args()
     try:
         if a.mode=='package-check':package_check()
         elif a.mode=='fetch':fetch()
         elif a.mode=='identity':identity()
         elif a.mode=='formal':formal()
         elif a.mode=='sta-results':sta_results()
+        elif a.mode=='sta-reports':capture_reports(Path('/work/sta'),['units','wns','tns'])
         elif a.mode=='snapshots':snapshots()
         else:seal(a.directory)
     except FormalCounterexample as ex:

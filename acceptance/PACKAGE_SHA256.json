@@ -3,10 +3,10 @@
   "self_excluded": true,
   "files": {
     ".github/workflows/final_netlist_acceptance.yml": "5219380183c2ea90ab464a46ca7945c3538fc0d6df63b0b633d3cd2fc9e37c27",
-    "acceptance/verify.py": "f15fdd18cf188ec028d3574de76a4ff084d38e42ff4cf35a10465bc3823b2e39",
-    "acceptance/run.sh": "f44fa4fab9dddb2c132c814e7c48518175359edf99823aa4cefef8295c4f12ca",
-    "acceptance/sta.tcl": "c1a821baf5257c99e6a8e106c487137b60b2f9eb4527eea0076bd8500dae38ad",
-    "acceptance/snapshot.tcl": "8404db0e9c0b5292a2c614eea4729c5abf30c0652f3a2ffd9188dbe988856cad",
+    "acceptance/verify.py": "e5536e4e5fa8706275c2b3e1bafe5b99d73a879033d999835dd9060a2cc7b64f",
+    "acceptance/run.sh": "44c094fef375fd2e4485d71cde25fe2f7eb99824ea4af3d7a79b1587ed4f33e6",
+    "acceptance/sta.tcl": "a9c229f68be41f53193a89a3c1e61b27ce83e5d1c2ca4f749a4cba5ac255133d",
+    "acceptance/snapshot.tcl": "b699b0a9879e30eb4bbeddc5e2dc0478976177128bb36a681f77314ae3bf99ca",
     "acceptance/miter.v": "6f0f4600f2a8004427e8381d39c246306de54754b5993bbcdd55180c5097d824",
     "verieda/__init__.py": "a5131213bc9b02b10a9d50568d581abfee1f56a13abcd928563dfd9e34093b28",
     "verieda/__main__.py": "bb2e3b5ba9b7662cc3fb2ff66b58666917a684ad670891e3d8c6c97c94d6a75c",
@@ -17,7 +17,10 @@
     "tests/test_native_bridge.py": "5ad364667705fe1b37c06609c824ff422a7a96e95a840064e7e7b95f261eee97",
     "acceptance/.gitattributes": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9",
     "verieda/native.py": "1e7bba58bb7d3394e3e3670526c7c41de1ef1c214a067ff0f4b1f07d769419f7",
-    "tests/test_native_evidence.py": "727503f08ea0028f0ff5ec1b1529143bf3b27444cf5620496ebb84b6a3c7db5c"
+    "tests/test_native_evidence.py": "727503f08ea0028f0ff5ec1b1529143bf3b27444cf5620496ebb84b6a3c7db5c",
+    "tests/test_adapter_repair.py": "9f528f87598c7fd314f21c732831f0e91eea04d7bcd92cdcda210cf0c396518f",
+    "tests/fixtures/yosys_sat_help_39451358576.txt": "75d5edc5ba6457ee1f188b2fe9b849940b637d27722ced8e01e5f2d06db95578",
+    "tests/fixtures/.gitattributes": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9"
   },
   "scope": "existing final netlist only; no physical optimization; no baseline promotion",
   "authorization_boundary": "Integrity manifest only; this file does not authorize push or dispatch."
