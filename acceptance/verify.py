@@ -5,6 +5,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from verieda.formal import observe_yosys
 from verieda.constraints import compare_sdc
 from verieda.liberty import subset_liberty
+from verieda.invariants import strengthen_miter
 
 class FormalCounterexample(RuntimeError):pass
 
@@ -213,13 +214,19 @@ write_rtlil /work/formal/miter.il
             if c['connections'].get('CLK',c['connections'].get('C'))!=clock or c['type']=='$_DFF_N_':raise ValueError('HOLD noncommon clock')
             if 'CLK_POLARITY' in c['parameters'] and int(c['parameters']['CLK_POLARITY'],2)!=1:raise ValueError('HOLD negative clock')
     write(d/'coverage.json',{'functional_cells':sorted(used),'outputs':['req_rdy','resp_val','resp_msg[15:0]'],'output_bits':18,'no_blackbox':True,'common_positive_clock':True,'library_selection_sha256':sha(d/'library-selection.json'),'functional_library_sha256':sha(lib),'source_library_sha256':sha(frozen_lib),'closed_used_models':True})
-    proof='read_rtlil /work/formal/miter.il\nhierarchy -check -top acceptance_miter\nsat -seq 5 -tempinduct -maxsteps 32 -enable_undef -set-def-inputs -set-init-def -prove mismatch 0 -verify -timeout 30 -show mismatch -show-inputs -show-regs -dump_json /work/formal/counterexample.json\n'
+    augmented,relation,plan=strengthen_miter((d/'miter.il').read_bytes(),(d/'miter.json').read_bytes())
+    (d/'strengthened.il').write_bytes(augmented)
+    (d/'state_relation.v').write_bytes(relation)
+    write(d/'strengthening.json',plan)
+    proof='read_rtlil /work/formal/strengthened.il\nread_verilog -formal -sv /work/formal/state_relation.v\nhierarchy -check -top acceptance_miter\nproc; flatten; opt; dffunmap; opt_clean; check -assert\nwrite_json /work/formal/strengthened_miter.json\nwrite_rtlil /work/formal/strengthened_miter.il\nsat -seq 5 -tempinduct -maxsteps 32 -enable_undef -set-def-inputs -set-init-def -prove strengthened_mismatch 0 -verify -timeout 30 -show mismatch -show strengthened_mismatch -show-inputs -show-regs -dump_json /work/formal/counterexample.json\n'
     (d/'prove.ys').write_text(proof)
     rc=run([YOSYS,'-Q','-T','-s',str(d/'prove.ys')],d/'proof.log',budget())
     verdict=formal_verdict(rc,(d/'proof.log').read_text(errors='replace'))
     witness=counterexample_record(d/'counterexample.json')
-    if verdict=='FAIL_COUNTEREXAMPLE' and witness is None:verdict='UNKNOWN_INCOMPLETE_COUNTEREXAMPLE'
-    write(d/'result.json',{'FORMAL_EQUIVALENCE_GATE':verdict,'return_code':rc,'contract':'full 18-bit outputs after two forced reset edges for all future defined inputs','method':'basecase plus temporal induction; no BMC promotion',
+    if verdict=='FAIL_COUNTEREXAMPLE' and witness is None:verdict='UNKNOWN_AUXILIARY_PROPERTY_OR_WITNESS'
+    write(d/'result.json',{'FORMAL_EQUIVALENCE_GATE':verdict,'return_code':rc,'contract':'full 18-bit outputs after two forced reset edges for all future defined inputs','method':'basecase plus temporal induction of original property OR auxiliary violations; no BMC promotion',
+        'proof_property':'strengthened_mismatch == 0 implies original mismatch == 0',
+        'strengthening_manifest_sha256':sha(d/'strengthening.json'),'auxiliary_relation_status':'PROVED_WITH_PROPERTY' if verdict=='PASS_RESET_CONTRACT_UNBOUNDED' else 'UNPROVEN',
         'observation':observe_yosys(rc,(d/'proof.log').read_text(errors='replace')),
         'counterexample':witness,'engine_sha256':sha(YOSYS),
         'proof_script_sha256':sha(d/'prove.ys'),'miter_source_sha256':sha('/audit/miter.v'),'runtime_seconds':time.monotonic()-started})
