@@ -53,7 +53,8 @@
     "contracts/registry.json": "d181e4af6fe2c4601004f960ea5ea575d82f75d88f3288f0556a4e068bc0b0b2",
     "scripts/verieda_formal_inputs.py": "81acb755cfdf1b1035c913df96cab6be79eb6d0336fd0d7e94fe9ae995a0e197",
     "tests/test_formal_runtime.py": "80305155aad8506ae238e0e63d3717932fed2cf464b55431ce4aeb5d6fc5d8b2",
-    "tests/test_formal_inputs.py": "8cd1ae26a825bb3eb94cc1e9166229aaee67c42af5205a78e87a5b03389e8615"
+    "tests/test_formal_inputs.py": "8cd1ae26a825bb3eb94cc1e9166229aaee67c42af5205a78e87a5b03389e8615",
+    "contracts/.gitattributes": "0fce5f7f295a8b04b2df5cafff233c572d84fd001954b0443ce589ac0168be51"
   },
   "scope": "existing final netlist only; no physical optimization; no baseline promotion",
   "authorization_boundary": "Integrity manifest only; this file does not authorize push or dispatch."
