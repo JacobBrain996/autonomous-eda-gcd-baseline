@@ -12,6 +12,7 @@ from .action_results import seal_action,inspect_action,advance_action
 from .verification import load_subject,plan_verification,prepare_verification,verify_verification_package,review_candidate
 from .formal_runtime import execute_formal
 from .formal_review import inspect_formal
+from .triage import diagnose
 
 def read(path,limit):
     p=Path(path)
@@ -25,6 +26,8 @@ def main():
     p=sub.add_parser('inspect',help='independently audit an ORFS artifact ZIP or directory')
     p.add_argument('artifact');p.add_argument('--expect',help='external experiment_identity.json')
     p.add_argument('--expected-sha256',help='trusted SHA256 of the original ZIP')
+    p=sub.add_parser('diagnose',help='bounded saved-log triage; no fault executable, ISA or design verdict')
+    p.add_argument('artifact');p.add_argument('--expected-sha256',required=True)
     p=sub.add_parser('inspect-acceptance',help='audit native acceptance bundle; no proof promotion')
     p.add_argument('artifact');p.add_argument('--expected-sha256')
     p=sub.add_parser('compare-constraints',help='strict exported-SDC literal profile; never executes Tcl')
@@ -69,7 +72,10 @@ def main():
     p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
     args=parser.parse_args()
     try:
-        if args.command=='inspect-formal':
+        if args.command=='diagnose':
+            state=diagnose(args.artifact,args.expected_sha256)
+            rc=0 if state['evidence_gate']=='PASS' and state['analysis_gate']=='PASS' else 2
+        elif args.command=='inspect-formal':
             state=inspect_formal(args.package,args.contract,args.result,args.expected_sha256)
             rc=0 if state['scope_structure_gate']=='PASS_STATIC_CHECKS' else 2
         elif args.command=='execute-formal':

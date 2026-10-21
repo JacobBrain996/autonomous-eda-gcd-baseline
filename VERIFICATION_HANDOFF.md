@@ -184,3 +184,24 @@ solver's soundness nor replays a witness. Exit 0 means static review completed,
 not hardware PASS. Incomplete/error archives retain their raw tool observation;
 failed scope checks exit 2 and cannot unlock dependent execution. No new EDA run
 or public push is authorized by this software increment.
+
+## Saved failure triage (local increment after 9a84b59)
+
+`diagnose ARTIFACT.zip --expected-sha256 TRUSTED_SHA` verifies bounded ZIP
+checksums/sizes and classifies saved execution logs and typed exit receipts.
+It handles Make-wrapped SIGILL reports, timeout/kill cleanup, model/capability
+gaps, reported counterexamples, admission HOLD and shell exit-code hints.
+Findings include only archive-relative source path/line/hash, not log content or
+process environments. No failure signature does not establish success.
+
+This is a design-independent interpretation layer, not a new EDA run or deep
+Kepler diagnosis. A 132 exit is only a possible shell signal encoding; a kill
+used to enforce timeout does not prove OOM. Reported SIGILL never establishes
+faulting ELF, fault instruction or AVX-512 causality. Contradictory receipts HOLD.
+It does not mutate prior design/candidate state IDs, authorize retry or write the
+project Goal. Actual retained Run 1 produces REVIEW_REPORTED_SIGNAL with the CTS
+log coordinate and unknown executable/ISA cause.
+
+These changes are local and excluded from the explicitly approved 9a84b59
+publication/cloud run. Runtime evidence for that run must remain attributed to
+9a84b59, not to a later local software revision.
