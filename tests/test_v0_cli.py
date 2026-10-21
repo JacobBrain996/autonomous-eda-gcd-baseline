@@ -38,5 +38,19 @@ class V0CLITests(unittest.TestCase):
             self.assertEqual(rc,0);self.assertEqual(result['status'],'NOT_RUN')
             rc,result=self.cli('execute-action','--package',out,'--frozen-root','__missing__','--work','__missing_work__','--execute')
             self.assertEqual(rc,2);self.assertEqual(result['status'],'UNKNOWN')
+    def test_recover_actual_default_not_run_and_inspect_without_tool_execution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _,r=self.cli('plan','--profile',PROFILE,'--smoke',SMOKE,'--acceptance',NATIVE,'--budget-seconds','600')
+            c=pathlib.Path(tmp)/'candidate.json';c.write_text(json.dumps(r['decision']['selected_candidate']))
+            out=pathlib.Path(tmp)/'package';work=pathlib.Path(tmp)/'output';work.mkdir();z=pathlib.Path(tmp)/'result.zip'
+            self.cli('prepare-action','--profile',PROFILE,'--smoke',SMOKE,'--acceptance',NATIVE,'--candidate',c,'--output',out)
+            _,launcher=self.cli('execute-action','--package',out,'--frozen-root','__missing__','--work','__missing_work__')
+            (work/'launcher-result.json').write_text(json.dumps(launcher))
+            rc,sealed=self.cli('seal-action','--package',out,'--work',work,'--output',z)
+            self.assertEqual(rc,0)
+            rc,observation=self.cli('inspect-action',z,'--expected-sha256',sealed['sha256'],'--expected-candidate',r['decision']['selected_candidate']['candidate_id'])
+            self.assertEqual(rc,0);self.assertEqual(observation['status'],'NOT_RUN');self.assertIsNone(observation['history_record'])
+            rc,feedback=self.cli('advance-action','--profile',PROFILE,'--smoke',SMOKE,'--acceptance',NATIVE,'--result',z,'--expected-sha256',sealed['sha256'],'--budget-seconds','600')
+            self.assertEqual(rc,0);self.assertEqual(feedback['decision'],'AWAIT_SEPARATE_EXECUTION_AUTHORIZATION');self.assertEqual(feedback['history'],[])
 
 if __name__=='__main__':unittest.main()

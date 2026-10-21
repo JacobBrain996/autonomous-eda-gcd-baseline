@@ -8,6 +8,7 @@ from .case import load_case,read_json
 from .policy import propose
 from .adoption import evaluate
 from .execution import prepare_action,execute_action
+from .action_results import seal_action,inspect_action,advance_action
 
 def read(path,limit):
     p=Path(path)
@@ -39,9 +40,25 @@ def main():
     p=sub.add_parser('execute-action',help='native Linux isolated synthesis; default NOT_RUN, needs separate authorization')
     for part in ('package','frozen-root','work'):p.add_argument('--'+part,required=True)
     p.add_argument('--execute',action='store_true');p.add_argument('--image-identity',help='minimal host Docker image identity record, required for execution')
+    p=sub.add_parser('seal-action',help='seal only allowlisted saved action outputs; no execution')
+    for part in ('package','work','output'):p.add_argument('--'+part,required=True)
+    p=sub.add_parser('inspect-action',help='inspect saved phase evidence and bounded outcome history; no adoption')
+    p.add_argument('artifact');p.add_argument('--expected-sha256');p.add_argument('--expected-candidate')
+    p=sub.add_parser('advance-action',help='update bounded history and pending verification from pinned result evidence; no execution')
+    for part in ('profile','smoke','acceptance','result','expected-sha256'):p.add_argument('--'+part,required=True)
+    p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
     args=parser.parse_args()
     try:
-        if args.command=='prepare-action':
+        if args.command=='advance-action':
+            case=load_case(read_json(args.profile),args.smoke,args.acceptance)
+            state=advance_action(case,args.result,args.expected_sha256,args.budget_seconds,read_json(args.history) if args.history else [])
+            rc=2 if state['observation']['evidence_gate']=='FAIL' else 0
+        elif args.command=='seal-action':
+            state=seal_action(args.package,args.work,args.output);rc=0
+        elif args.command=='inspect-action':
+            state=inspect_action(args.artifact,args.expected_sha256,args.expected_candidate)
+            rc=2 if state['evidence_gate']=='FAIL' else 0
+        elif args.command=='prepare-action':
             case=load_case(read_json(args.profile),args.smoke,args.acceptance)
             state=prepare_action(case,read_json(args.candidate),args.output);rc=0
         elif args.command=='execute-action':

@@ -8,6 +8,9 @@ EFFECTIVE=b'''.PHONY: verieda-effective
 verieda-effective:
 \t@printf 'ABC_AREA=%s\\nLEC_CHECK=%s\\nSEC_CHECK=%s\\nPLATFORM=%s\\nDESIGN_NAME=%s\\nYOSYS_EXE=%s\\nOPENROAD_EXE=%s\\nPYTHON_EXE=%s\\n' '$(ABC_AREA)' '$(LEC_CHECK)' '$(SEC_CHECK)' '$(PLATFORM)' '$(DESIGN_NAME)' '$(YOSYS_EXE)' '$(OPENROAD_EXE)' '$(PYTHON_EXE)'
 '''
+EXPECTED_EFFECTIVE=(b'ABC_AREA=0\nLEC_CHECK=1\nSEC_CHECK=1\nPLATFORM=nangate45\nDESIGN_NAME=gcd\n'
+                    b'YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys\n'
+                    b'OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad\nPYTHON_EXE=/usr/bin/python3\n')
 
 def _sha(path):return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
 def _json_bytes(obj):return (json.dumps(obj,sort_keys=True,indent=2,allow_nan=False)+'\n').encode()
@@ -81,13 +84,13 @@ def _run(argv,cwd,env,log,seconds):
     with pathlib.Path(log).open('xb') as stream:
         process=subprocess.Popen(argv,cwd=cwd,env=env,stdin=subprocess.DEVNULL,stdout=stream,stderr=subprocess.STDOUT,
                                  shell=False,start_new_session=True,preexec_fn=_limits)
-        try:rc=process.wait(timeout=max(0.01,seconds))
+        try:rc=process.wait(timeout=max(0.01,seconds));child_rc=rc
         except subprocess.TimeoutExpired:
             timed_out=True
             try:os.killpg(process.pid,signal.SIGKILL)
             except ProcessLookupError:pass
-            process.wait();rc=124
-    return {'argv':argv,'return_code':rc,'timeout':timed_out,'signal':-rc if rc<0 else None,
+            child_rc=process.wait();rc=124
+    return {'argv':argv,'return_code':rc,'child_return_code':child_rc,'pid':process.pid,'timeout':timed_out,'signal':-child_rc if child_rc<0 else None,
             'runtime_seconds':time.monotonic()-start,'log_sha256':_sha(log)}
 
 def _source_inventory(root,git_executable='/usr/bin/git'):
@@ -131,11 +134,8 @@ def execute_action(package,frozen_root,work,execute=False,image_record=None):
     try:
         pre=_run(make_argv(bundle/'effective.mk',out,'verieda-effective'),root/'flow',env,out/'effective.log',20)
         receipt['steps'].append(pre);receipt['return_code']=pre['return_code']
-        expected=('ABC_AREA=0\nLEC_CHECK=1\nSEC_CHECK=1\nPLATFORM=nangate45\nDESIGN_NAME=gcd\n'
-                  'YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys\n'
-                  'OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad\nPYTHON_EXE=/usr/bin/python3\n')
         if pre['return_code']!=0:receipt['status']='TIMEOUT' if pre['timeout'] else 'ERROR'
-        elif (out/'effective.log').read_text()!=expected:receipt['status']='HOLD_EFFECTIVE_VARIABLES'
+        elif (out/'effective.log').read_bytes()!=EXPECTED_EFFECTIVE:receipt['status']='HOLD_EFFECTIVE_VARIABLES'
         else:
             remaining=300-(time.monotonic()-start)
             if remaining<=0:receipt.update(status='TIMEOUT',return_code=124)
@@ -143,10 +143,13 @@ def execute_action(package,frozen_root,work,execute=False,image_record=None):
                 run=_run(make_argv(bundle/'effective.mk',out,'synth'),root/'flow',env,out/'synth.log',remaining)
                 receipt['steps'].append(run);receipt['return_code']=run['return_code']
                 netlist=out/'results/nangate45/gcd/verieda/1_2_yosys.v'
+                odb=out/'results/nangate45/gcd/verieda/1_synth.odb'
                 if run['return_code']!=0:receipt['status']='TIMEOUT' if run['timeout'] else 'ERROR'
                 elif not netlist.is_file() or not 0<netlist.stat().st_size<=16*1024*1024:receipt['status']='HOLD_MISSING_NETLIST'
+                elif not odb.is_file() or not 0<odb.stat().st_size<=16*1024*1024:receipt['status']='HOLD_MISSING_ODB'
                 elif 'Using ABC speed script.' not in (out/'synth.log').read_text(errors='replace'):receipt['status']='HOLD_MAPPING_NOT_OBSERVED'
-                else:receipt.update(status='SYNTHESIS_COMPLETED',netlist_sha256=_sha(netlist),netlist_path='results/nangate45/gcd/verieda/1_2_yosys.v')
+                else:receipt.update(status='SYNTHESIS_COMPLETED',netlist_sha256=_sha(netlist),netlist_path='results/nangate45/gcd/verieda/1_2_yosys.v',
+                                    odb_sha256=_sha(odb),odb_path='results/nangate45/gcd/verieda/1_synth.odb')
     except (OSError,ValueError,subprocess.SubprocessError) as ex:receipt.update(status='ERROR',error=str(ex))
     receipt['runtime_seconds']=time.monotonic()-start
     with (out/'action-execution.json').open('xb') as f:f.write(_json_bytes(receipt))

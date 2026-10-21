@@ -4,6 +4,24 @@
 
 ### Isolated action adapter
 
+#### Results and feedback
+
+The same CLI recovers the action phase without executing EDA:
+
+```powershell
+python -m verieda seal-action --package PACKAGE_DIR --work SAVED_OUTPUT_DIR --output NEW_RESULT.zip
+python -m verieda inspect-action NEW_RESULT.zip --expected-sha256 TRUSTED_ZIP_SHA256 --expected-candidate CANDIDATE_ID
+python -m verieda advance-action --profile cases/gcd.json --smoke SMOKE.zip --acceptance ACCEPTANCE.zip --result NEW_RESULT.zip --expected-sha256 TRUSTED_ZIP_SHA256 --budget-seconds 600
+```
+
+The sealer copies only package state/candidate/manifest/effective.mk, action-execution.json or launcher-result.json, two fixed logs and the designated synthesis netlist/ODB. It never recursively exports the work directory. Other files, including unrelated private data, are excluded. Links/oversized files are rejected, payloads receive complete SHA256 and size coverage, and output ZIPs cannot overwrite an existing file. A package from an older recorded adapter can be sealed/observed without replacing its source identities with current code; this does not authorize executing old package code.
+
+Inspection checks exact state/candidate binding, fixed Make argv, effective values, raw log/output hashes, frozen source/tool fingerprint claims, numerical runtime, exit code, timeout/signal consistency and required outputs. It retains PID/actual child exit when recorded, but does not infer a faulting executable from a shell/Make failure. Missing outputs, inconsistent claims, malformed receipts or a foreign identity stay UNKNOWN with no history record. NOT_RUN also produces no cost/history entry. Trusted archive SHA anchors archive bytes; source fingerprints and caller-supplied host records alone do not authenticate a cloud run. External run/commit/job binding remains a separate requirement.
+
+`advance-action` reads the pinned ZIP itself; it cannot accept an agent-written observation as proof. It returns updated bounded history and budget, does not modify source/history files, and never executes a workflow. Save its `history` array for subsequent `--history FILE` use. Re-reading the same result is idempotent; conflicting records require HOLD. A completed synthesis creates an UNKNOWN adoption outcome and VERIFY_PENDING_CANDIDATE, with new-netlist Formal/physical/timing/constraint/adoption checks NOT_RUN. It does not reuse the old final-netlist proof for the new design. Failures enter STOP_REVIEW_FAILURE, exhausted budget STOP_BUDGET, unexecuted actions AWAIT_SEPARATE_EXECUTION_AUTHORIZATION. No implicit retry or budget expansion occurs.
+
+Real EDA efficacy, authenticated remote receipt integration and full native action validation remain NOT_RUN. Successful/failed native process fixtures in tests are explicitly synthetic. The local end-to-end demonstration uses the actual default NOT_RUN response, not a fabricated successful EDA run.
+
 The frozen GCD config explicitly sets ABC_AREA=1; retained Smoke `1_2_yosys.log` confirms `Using ABC area script.`. The pinned synth preamble selects `abc_speed.script` when ABC_AREA=0. `verieda/action_support.json` records exact public source SHA256, frozen image and core binaries; source bytes were checked against GitHub's frozen-commit Git blob IDs. This establishes an actual parameter change, not a no-op or measured benefit.
 
 After saving a selected candidate JSON from `plan`:

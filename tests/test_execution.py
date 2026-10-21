@@ -55,6 +55,7 @@ class ExecutionTests(unittest.TestCase):
             with patch('verieda.execution.subprocess.Popen',return_value=proc) as popen,patch('verieda.execution.os.killpg',create=True) as kill,patch('verieda.execution.signal.SIGKILL',9,create=True):
                 result=_run(['make'],'/source',{},pathlib.Path(tmp)/'timeout.log',1)
                 self.assertTrue(result['timeout']);self.assertEqual(result['return_code'],124)
+                self.assertEqual(result['child_return_code'],-9);self.assertEqual(result['pid'],123)
                 kill.assert_called_once();self.assertEqual(kill.call_args.args[0],123)
                 self.assertFalse(popen.call_args.kwargs['shell']);self.assertTrue(popen.call_args.kwargs['start_new_session'])
             proc=Mock(pid=124);proc.wait.return_value=-4
@@ -81,5 +82,22 @@ class ExecutionTests(unittest.TestCase):
             (root/'flow/settings.mk').write_text('$(shell echo must-never-execute)\n')
             self.assertEqual(call('status','--porcelain'),b'')
             with self.assertRaises(ValueError):_source_inventory(root,git)
+    def test_synthesis_success_without_expected_odb_remains_hold(self):
+        from verieda.execution import EXPECTED_EFFECTIVE
+        with tempfile.TemporaryDirectory() as tmp:
+            root=pathlib.Path(tmp);bundle=root/'package';prepare_action(self.state,self.candidate,bundle)
+            frozen=root/'frozen';frozen.mkdir();work=root/'output'
+            support=json.loads((ROOT/'verieda/action_support.json').read_text())
+            image={'image_id':support['image_id'],'repo_digests':[support['image']],'os':'linux','architecture':'amd64'}
+            def saved_fixture(argv,cwd,env,log,seconds):
+                if argv[-1]=='verieda-effective':pathlib.Path(log).write_bytes(EXPECTED_EFFECTIVE)
+                elif argv[-1]=='synth':
+                    pathlib.Path(log).write_bytes(b'Using ABC speed script.\nSYNTHETIC_ONLY\n')
+                    net=work/'results/nangate45/gcd/verieda/1_2_yosys.v';net.parent.mkdir(parents=True);net.write_bytes(b'SYNTHETIC_ONLY')
+                else:raise AssertionError('unexpected target')
+                return {'argv':argv,'return_code':0,'timeout':False,'signal':None,'runtime_seconds':0}
+            with patch('verieda.execution._native_identity',return_value={}),patch('verieda.execution._posix_path',side_effect=str),patch('verieda.execution._run',side_effect=saved_fixture):
+                r=execute_action(bundle,frozen,work,True,image)
+            self.assertEqual(r['status'],'HOLD_MISSING_ODB');self.assertEqual(r['FORMAL_EQUIVALENCE_GATE'],'NOT_RUN')
 
 if __name__=='__main__':unittest.main()
