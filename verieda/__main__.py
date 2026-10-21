@@ -7,6 +7,7 @@ from .native import inspect_acceptance
 from .case import load_case,read_json
 from .policy import propose
 from .adoption import evaluate
+from .execution import prepare_action,execute_action
 
 def read(path,limit):
     p=Path(path)
@@ -33,9 +34,21 @@ def main():
     for side in ('before','after'):
         for part in ('profile','smoke','acceptance'):p.add_argument('--'+side+'-'+part,required=True)
     p.add_argument('--candidate',required=True)
+    p=sub.add_parser('prepare-action',help='write an exclusive isolated synthesis package; never executes EDA')
+    for part in ('profile','smoke','acceptance','candidate','output'):p.add_argument('--'+part,required=True)
+    p=sub.add_parser('execute-action',help='native Linux isolated synthesis; default NOT_RUN, needs separate authorization')
+    for part in ('package','frozen-root','work'):p.add_argument('--'+part,required=True)
+    p.add_argument('--execute',action='store_true');p.add_argument('--image-identity',help='minimal host Docker image identity record, required for execution')
     args=parser.parse_args()
     try:
-        if args.command=='plan':
+        if args.command=='prepare-action':
+            case=load_case(read_json(args.profile),args.smoke,args.acceptance)
+            state=prepare_action(case,read_json(args.candidate),args.output);rc=0
+        elif args.command=='execute-action':
+            state=execute_action(args.package,args.frozen_root,args.work,args.execute,
+                                 read_json(args.image_identity,65536) if args.execute and args.image_identity else None)
+            rc=0 if state['status'] in ('NOT_RUN','SYNTHESIS_COMPLETED') else 2
+        elif args.command=='plan':
             case=load_case(read_json(args.profile),args.smoke,args.acceptance)
             state={'state':case,'decision':propose(case,args.budget_seconds,read_json(args.history) if args.history else [])};rc=0
         elif args.command=='evaluate':

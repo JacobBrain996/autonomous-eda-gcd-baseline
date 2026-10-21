@@ -1,0 +1,20 @@
+{
+  "orfs_commit": "3a964e13f11a4e435aac01ffa14db0a7d2853720",
+  "sources": {
+    "flow/designs/nangate45/gcd/config.mk": "ebc6c7a30ff59c00bdc177b34a59d3c667e0c9698b4c0c4aba73486ea044b737",
+    "flow/scripts/synth_preamble.tcl": "768c16b0fdc71293126e7642ab528d73ec96d184a6f91fb2d5fc6727222e4f25",
+    "flow/Makefile": "1ca0d6a0d9bd76adfd03a5a09cd5e07325608a2c88771dd90b17e661db0c2c97",
+    "flow/scripts/variables.mk": "3cba7ede6cdd606381df39dc3f4060ddc7927d4312a9cd79694490f1f19af46b",
+    "flow/scripts/abc_speed.script": "b9fdf10e71bed1207573261c5496df103d73aaee09d86d327cdfe6afbfa07114",
+    "flow/platforms/nangate45/lib/NangateOpenCellLibrary_typical.lib": "8d540a4d4cf6d09d27c87ad067857a9c0c2eeb023ab7a56e058cd3113db4e9b1"
+  },
+  "provenance": "Action script/config sources: GitHub frozen-commit Contents API; exact bytes checked against returned Git blob SHA1. Liberty/core binaries/image: reviewed native acceptance 39544704950 identity. Smoke 1_2_yosys.log reports Using ABC area script and abc_area.script. Effective Make values still require native preflight.",
+  "baseline_ABC_AREA": 1,
+  "candidate_ABC_AREA": 0,
+  "image_id": "sha256:3f6ade90d4e7307c84a6735b7c2713ee4ecbaaad50a7b8117601758196f7c56d",
+  "image": "openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9",
+  "binaries": {
+    "/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys": "5cd52bc790d39b1e59a88112e9132ef8de338c2a26e4b0df8222d937e65bab92",
+    "/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad": "7d11382dd5197f40858da92a7ac7c4e32fdeb3f9985a04e77a04e61e4fbfc96e"
+  }
+}

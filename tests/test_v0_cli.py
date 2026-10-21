@@ -27,5 +27,16 @@ class V0CLITests(unittest.TestCase):
     def test_invalid_input_returns_structured_unknown(self):
         rc,r=self.cli('plan','--profile','__missing_profile__','--smoke',SMOKE,'--acceptance',NATIVE)
         self.assertEqual(rc,2);self.assertEqual(r['status'],'UNKNOWN')
+    def test_prepare_and_default_execute_do_not_start_tools(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _,r=self.cli('plan','--profile',PROFILE,'--smoke',SMOKE,'--acceptance',NATIVE,'--budget-seconds','600')
+            c=pathlib.Path(tmp)/'candidate.json';c.write_text(json.dumps(r['decision']['selected_candidate']))
+            out=pathlib.Path(tmp)/'package'
+            rc,result=self.cli('prepare-action','--profile',PROFILE,'--smoke',SMOKE,'--acceptance',NATIVE,'--candidate',c,'--output',out)
+            self.assertEqual(rc,0);self.assertEqual(result['execution_status'],'NOT_RUN')
+            rc,result=self.cli('execute-action','--package',out,'--frozen-root','__missing__','--work','__missing_work__')
+            self.assertEqual(rc,0);self.assertEqual(result['status'],'NOT_RUN')
+            rc,result=self.cli('execute-action','--package',out,'--frozen-root','__missing__','--work','__missing_work__','--execute')
+            self.assertEqual(rc,2);self.assertEqual(result['status'],'UNKNOWN')
 
 if __name__=='__main__':unittest.main()

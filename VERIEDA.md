@@ -2,6 +2,27 @@
 
 ## V0 software checkpoint — 2026-10-21 (supersedes historical status below)
 
+### Isolated action adapter
+
+The frozen GCD config explicitly sets ABC_AREA=1; retained Smoke `1_2_yosys.log` confirms `Using ABC area script.`. The pinned synth preamble selects `abc_speed.script` when ABC_AREA=0. `verieda/action_support.json` records exact public source SHA256, frozen image and core binaries; source bytes were checked against GitHub's frozen-commit Git blob IDs. This establishes an actual parameter change, not a no-op or measured benefit.
+
+After saving a selected candidate JSON from `plan`:
+
+```powershell
+python -m verieda prepare-action --profile cases/gcd.json --smoke evidence/smoke-9644bb3f8ed4/NO_LEC_SMOKE-38226418563.zip --acceptance evidence/final-acceptance-bbf5c1de8b7c/acceptance-39544704950.zip --candidate evidence/verieda-v0-20261021/candidate.json --output evidence/my-new-mapping-package
+python -m verieda execute-action --help
+```
+
+Preparation is offline and exclusive: never overwrite an existing package. `execute-action` defaults to NOT_RUN. It supports only a fixed synthesis action in a separately authorized Linux x86_64 container, with a clean frozen Git checkout mounted read-only, matching source/tool hashes and fresh output outside source/package. `--execute` is a caller opt-in, not evidence of user/cloud authorization; it must not be set by an automatic goal continuation. The native work path must be an absolute POSIX path without whitespace/Make metacharacters. Use isolated WORK_HOME, FLOW_VARIANT=verieda, ABC_AREA=0, LEC_CHECK=1 and SEC_CHECK=1. Unknown effective values stop before synthesis. No RTL/SDC/ORFS edits, Make clean target, arbitrary target or inherited host environment is allowed.
+
+Native execution additionally requires `--image-identity FILE`, an external host Docker record containing exactly image_id, repo_digests, os and architecture, matching the frozen OCI image/ID (linux/amd64). Do not export full docker inspect, process environment or credentials. Matching this caller-supplied record is not cryptographic attestation; the actual cloud runner must bind its host capture to the job.
+
+Make's YOSYS_EXE/OPENROAD_EXE/PYTHON_EXE are explicitly pinned and included in the effective-value check; the executables cannot silently resolve to a second installation beneath the source checkout. Before Make starts, the adapter rejects tracked/untracked dirt and all ignored files beneath flow (including ignored settings.mk). A read-only mount alone would not prevent an existing settings.mk from being evaluated. This deliberately strict fresh-source policy may HOLD a checkout containing caches; prepare a clean source mount rather than deleting user files automatically.
+
+Total synthesis action limit is 300 s, effective-variable check at most 20 s, child-produced file limit 16 MiB, core disabled. Timeout kills the child process group. Each actual tool return code, signal, argv, log hash, runtime and resulting synthesis-netlist hash is recorded in a fresh output action-execution.json. A zero Make rc without its expected netlist/speed mapping log remains HOLD. SYNTHESIS_COMPLETED is **not** PPA improvement, Formal PASS, GDS generation, or candidate acceptance; adoption requires a COMPLETED RTL_TO_GDS receipt plus independent gates. The old final-netlist proof cannot be reused to certify a newly mapped candidate.
+
+Native Linux EDA/container integration is NOT_RUN. Windows/offline tests cover package generation/tampering, native guards and process API doubles for timeout/SIGILL. No new cloud workflow or actual EDA execution was performed. The full RTL→GDS/verification/recovery adapter and authenticated run/receipt ingestion remain work to do; this increment makes the first isolated action runnable after separate authorization, not a completed autonomous optimization loop.
+
 The native acceptance Run 39544704950 at bbf5c1d proved final-netlist sequential equivalence for **two common synchronous reset edges followed by arbitrary defined inputs, all 18 output bits**. Timing still fails (WNS -0.1615832 ns, TNS -7.086462975 ns, 51 endpoints); full constraint coverage is UNKNOWN. These are independent engineering tasks, not prerequisites for software development. Historical checkpoints below remain an execution record, not current authority.
 
 The V0 CLI now joins pinned Smoke/acceptance archives, proposes bounded candidates using an explainable rule policy, and evaluates candidate adoption separately:

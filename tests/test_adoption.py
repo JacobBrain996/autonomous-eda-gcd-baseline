@@ -17,7 +17,7 @@ class AdoptionTests(unittest.TestCase):
         c=propose(before,600,[])['selected_candidate']
         after=copy.deepcopy(before);after['metrics']['WNS']['value']=0;after['gates']['timing']='PASS';after['gates']['constraints']='PASS'
         after['inputs']['6_final.v']='e'*64;after['provenance']['acceptance']['sha256']='f'*64
-        after['execution']={'candidate_id':c['candidate_id'],'state_id':before['state_id'],'return_code':0,'changes':c['changes']}
+        after['execution']={'candidate_id':c['candidate_id'],'state_id':before['state_id'],'return_code':0,'changes':c['changes'],'phase':'RTL_TO_GDS','status':'COMPLETED'}
         bind(after);return before,after,c
     def test_acceptance_requires_all_independent_gates_and_improvement(self):
         b,a,c=self.setup_states();r=evaluate(b,a,c)
@@ -53,5 +53,9 @@ class AdoptionTests(unittest.TestCase):
     def test_nonobject_candidate_is_structured_inconclusive(self):
         b,a,_=self.setup_states()
         self.assertEqual(evaluate(b,a,[])['verdict'],'INCONCLUSIVE')
+    def test_synthesis_only_or_hold_receipt_cannot_certify_action_execution(self):
+        for phase,status in [('SYNTHESIS_ONLY','SYNTHESIS_COMPLETED'),('RTL_TO_GDS','HOLD_MISSING_NETLIST')]:
+            b,a,c=self.setup_states();a['execution'].update(phase=phase,status=status);bind(a)
+            self.assertEqual(evaluate(b,a,c)['verdict'],'REJECTED')
 
 if __name__=='__main__':unittest.main()

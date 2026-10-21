@@ -26,6 +26,7 @@ def evaluate(before,after,candidate):
         if not isinstance(execution,dict):unknown.append('ACTION_EXECUTION_RECEIPT')
         elif (execution.get('candidate_id')!=candidate.get('candidate_id') or execution.get('state_id')!=before['state_id']
               or type(execution.get('return_code')) is not int or execution['return_code']!=0
+              or execution.get('phase')!='RTL_TO_GDS' or execution.get('status')!='COMPLETED'
               or digest(execution.get('changes'))!=digest(candidate.get('changes'))):reject.append('ACTION_EXECUTION_MISMATCH')
         contract=before.get('formal',{}).get('contract')
         if not contract:unknown.append('REFERENCE_FORMAL_CONTRACT')
