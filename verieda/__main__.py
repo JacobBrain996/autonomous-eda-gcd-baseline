@@ -15,6 +15,7 @@ from .formal_review import inspect_formal
 from .triage import diagnose
 from .decision import decide
 from .timing import explain_timing
+from .sta_min import observe_hold,build_hold_script,STA_PREFIX_SHA256
 
 def read(path,limit):
     p=Path(path)
@@ -35,6 +36,10 @@ def main():
     p=sub.add_parser('compare-constraints',help='strict exported-SDC literal profile; never executes Tcl')
     p.add_argument('reference');p.add_argument('candidate')
     p=sub.add_parser('observe-formal',help='classify a log; does not certify proof or witness')
+    p.add_argument('log');p.add_argument('--return-code',required=True,type=int)
+    p=sub.add_parser('prepare-hold-script',help='write exclusive native hold collector recipe; never executes')
+    p.add_argument('--output',required=True)
+    p=sub.add_parser('observe-hold',help='observe saved clipped min WNS/TNS; no final Timing PASS')
     p.add_argument('log');p.add_argument('--return-code',required=True,type=int)
     p=sub.add_parser('explain-timing',help='rank checked saved worst-path contributions; no EDA or causal claim')
     for part in ('profile','smoke','acceptance'):p.add_argument('--'+part,required=True)
@@ -82,7 +87,18 @@ def main():
     p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
     args=parser.parse_args()
     try:
-        if args.command=='explain-timing':
+        if args.command=='prepare-hold-script':
+            from .execution import _unlinked
+            script=build_hold_script();target=_unlinked(args.output)
+            with target.open('xb') as stream:stream.write(script)
+            state={'execution_status':'NOT_RUN','script_sha256':hashlib.sha256(script).hexdigest(),
+                   'initialization_sha256':STA_PREFIX_SHA256,'native_integration':'NOT_RUN',
+                   'requires':['fresh mounted final inputs','frozen source/library/binary/OCI identity admission','process timeout/resource limits','separate execution authorization'],'scope':'fixed GCD/Nangate45 native STA recipe only'};rc=0
+        elif args.command=='observe-hold':
+            raw,text=read(args.log,16*1024*1024);state=observe_hold(args.return_code,text)
+            state['raw_log_sha256']=hashlib.sha256(raw).hexdigest()
+            rc=0 if state['observation'] in ('NEGATIVE_HOLD_REPORTED','NO_NEGATIVE_HOLD_REPORTED') else 2
+        elif args.command=='explain-timing':
             case=load_case(read_json(args.profile),args.smoke,args.acceptance)
             state=explain_timing(case);rc=0 if state['contribution_gate']=='PASS_ARITHMETIC_CHECK' else 2
         elif args.command=='decide':

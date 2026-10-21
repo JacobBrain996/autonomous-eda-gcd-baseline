@@ -7,6 +7,7 @@ import hashlib, math, re, zipfile
 from pathlib import Path
 from .evidence import read_bundle, verify_bundle, object_json
 from .formal import observe_yosys
+from .sta_min import observe_hold
 
 PREFIX='final-acceptance/'
 OUTPUT=PREFIX+'output/'
@@ -25,7 +26,7 @@ def _validation_coverage(data):
                       bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
     return {'schema':'verieda.validation-coverage.v1','coverage_report':report,
             'checker_capabilities':{'setup_wns_tns':'IMPLEMENTED_OBSERVATION_ONLY',
-                                    'independent_hold':'NOT_IMPLEMENTED',
+                                    'independent_hold':'OFFLINE_OBSERVER_IMPLEMENTED_NATIVE_UNVALIDATED',
                                     'constraint_coverage_certification':'NOT_IMPLEMENTED',
                                     'raw_formal_result':'OBSERVATION_ONLY_NOT_CERTIFIED'},
             'required_observations':['independent_min_delay_paths_and_wns_tns',
@@ -106,6 +107,16 @@ def inspect_acceptance(path,expected_archive_sha=None):
         state['gates']['formal']=observation['formal_gate']
         issue('FORMAL_UNCERTIFIED','property/model/reset/output coverage and authenticated execution still require independent validation')
     except (KeyError,ValueError,TypeError,UnicodeError) as ex:issue('FORMAL_EVIDENCE_INCOMPLETE',str(ex))
+    hold_log=OUTPUT+'sta/hold.log';hold_status=hold_log+'.status.json'
+    if hold_log in data or hold_status in data:
+        try:
+            status=obj(hold_status)
+            observation=observe_hold(status.get('return_code'),data[hold_log].decode('utf-8-sig'))
+            observation['raw_log_sha256']=hashlib.sha256(data[hold_log]).hexdigest()
+            state['hold_observation']=observation
+            if observation['hold_gate']=='FAIL':state['gates']['timing']='FAIL';state['acceptance']='NOT_ACCEPTED'
+        except (KeyError,ValueError,TypeError,UnicodeError) as ex:
+            state['hold_observation']={'hold_gate':'UNKNOWN','observation':'HOLD_REPORT_FORMAT','issues':[str(ex)]}
     claims=state.get('producer_claims',{})
     if ((state['gates']['timing']=='FAIL' and claims.get('TIMING_GATE')=='PASS')
         or claims.get('baseline_pass') is True):

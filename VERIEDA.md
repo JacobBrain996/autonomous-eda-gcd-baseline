@@ -3,8 +3,8 @@
 ## V0 software checkpoint — 2026-10-21 (supersedes historical status below)
 
 Current boundary: the executable planning/recovery core is not yet a complete
-verified autonomous optimization loop. The native acceptance importer does not
-implement independent hold or full constraint-coverage certification; loaded real
+verified autonomous optimization loop. The native hold observer/collector is prepared offline but not native-validated;
+full constraint-coverage certification is not implemented; loaded real
 cases therefore retain those unknowns. Synthetic accept/reject tests exercise the
 predicate, not a completed real candidate adoption. The project Goal remains
 unfinished independently of the particular GCD candidate's blocked proof.
@@ -327,3 +327,35 @@ Goal status. Local checkpoint: 245 tests, 244 passed and one Linux integration
 skipped; existing state/candidate binding tests still pass. No native hold result,
 coverage PASS, public push or new cloud job was created. Publication authorization
 pending for b19cc94 still excludes subsequent local commits.
+
+
+## Offline hold collection/observation preparation
+
+`python -m verieda prepare-hold-script --output NEW_STA_HOLD.tcl` writes an exclusive
+script and returns its SHA256, original initialization SHA and NOT_RUN status.
+It concatenates the exact reviewed acceptance/sta.tcl prefix with min WNS/TNS,
+all violating hold paths and top hold paths. The saved frozen OpenROAD help
+explicitly supports these -min commands. This recipe uses the fixed final-input
+GCD/Nangate45 mount convention; it does not consume a synthesis ODB or run itself.
+Future execution still needs read-only frozen mounts, bound final ODB/SDC/library,
+core binary/OCI/source identity, fresh output, bounded process/log resources and
+separate authorization. No new workflow or job is started by preparation.
+
+`python -m verieda observe-hold LOG --return-code CODE` classifies bounded saved
+stdout with exact units/min-report markers. Return 124 is TIMEOUT, nonzero is tool
+error, missing/ambiguous/nonfinite/inconsistent reports HOLD. Negative min WNS/TNS
+produce a FAIL observation. Zero is clipped WNS, not positive worst slack, and
+remains UNKNOWN pending coverage. Exit 0 means observation parsed, not Timing PASS.
+The observer cannot authenticate execution or certify constraint/clock coverage.
+
+`inspect-acceptance` optionally reads sta/hold.log with its paired status JSON;
+negative observations propagate as Timing FAIL, including into case import.
+Old bundles gain no fabricated hold result and existing case identities remain
+unchanged. Capability status is now OFFLINE_OBSERVER_IMPLEMENTED_NATIVE_UNVALIDATED,
+not a completed hold certificate. The original reporting inputs remain untouched.
+
+Checkpoint: 249 tests, 248 passed and one Linux-only integration skipped. Collector
+CLI and Tcl grouping syntax passed; the script was not evaluated or run in EDA.
+All successful/violating min-report fixtures are synthetic. Native min stdout
+format and integration remain unverified; full constraint certification is still
+missing. The pending b19cc94 publication authorization excludes this local work.

@@ -86,7 +86,7 @@ def _load_case(profile,smoke,acceptance):
         if (count!=len(endpoint_slack) or abs(min(endpoint_slack.values())-metrics['WNS']['value'])>5e-6
             or abs(sum(endpoint_slack.values())-metrics['TNS']['value'])>5e-6):raise ValueError('path slack/count/aggregate disagree with native timing evidence')
     worst=min(allpaths,key=lambda p:p['slack_ns']) if allpaths else None
-    gates['timing']='FAIL' if metrics['WNS']['value']<0 else 'UNKNOWN'
+    gates['timing']='FAIL' if metrics['WNS']['value']<0 or native['gates']['timing']=='FAIL' else 'UNKNOWN'
     formal={'gate':'UNKNOWN','observation':native.get('formal_observation',{}).get('observation','NOT_AVAILABLE'),
             'contract':None,'trust':'UNREVIEWED_ENGINE_REPORT'}
     review=profile.get('formal_review')

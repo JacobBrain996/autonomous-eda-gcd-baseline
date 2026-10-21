@@ -39,7 +39,7 @@ class NativeEvidenceTests(unittest.TestCase):
         r=s['validation_coverage']
         self.assertEqual(r['coverage_report']['status'],'EMPTY_NOT_A_CERTIFICATE')
         self.assertEqual(r['coverage_report']['bytes'],0)
-        self.assertEqual(r['checker_capabilities']['independent_hold'],'NOT_IMPLEMENTED')
+        self.assertEqual(r['checker_capabilities']['independent_hold'],'OFFLINE_OBSERVER_IMPLEMENTED_NATIVE_UNVALIDATED')
         self.assertEqual(r['checker_capabilities']['constraint_coverage_certification'],'NOT_IMPLEMENTED')
         self.assertFalse(r['can_certify_full_final_acceptance'])
         self.assertEqual(r['coverage_gate'],'UNKNOWN');self.assertEqual(s['gates']['timing'],'FAIL')
@@ -54,6 +54,43 @@ class NativeEvidenceTests(unittest.TestCase):
             self.assertEqual(r['coverage_report']['status'],'PRESENT_UNINTERPRETED')
             self.assertEqual(r['coverage_gate'],'UNKNOWN')
             self.assertFalse(r['can_certify_full_final_acceptance'])
+    def hold_log(self,wns='0',tns='0'):
+        return ('VERIEDA_REPORT_BEGIN units\ntime 1ns\nVERIEDA_REPORT_END units\n'
+                'VERIEDA_REPORT_BEGIN hold_wns\nwns min '+wns+'\nVERIEDA_REPORT_END hold_wns\n'
+                'VERIEDA_REPORT_BEGIN hold_tns\ntns min '+tns+'\nVERIEDA_REPORT_END hold_tns\n')
+    def test_hold_observer_distinguishes_violation_timeout_error_and_unproven_zero(self):
+        from verieda.sta_min import observe_hold
+        self.assertEqual(observe_hold(0,self.hold_log('-0.01','-0.02'))['hold_gate'],'FAIL')
+        r=observe_hold(0,self.hold_log());self.assertEqual(r['observation'],'NO_NEGATIVE_HOLD_REPORTED')
+        self.assertEqual(r['hold_gate'],'UNKNOWN');self.assertIsNone(r['worst_hold_slack_ns'])
+        self.assertEqual(observe_hold(124,self.hold_log())['observation'],'TIMEOUT')
+        self.assertEqual(observe_hold(1,self.hold_log())['observation'],'TOOL_ERROR')
+    def test_hold_parser_rejects_ambiguous_units_metrics_markers_and_missing_reports(self):
+        from verieda.sta_min import observe_hold
+        logs=[self.hold_log().replace('time 1ns','time 1ps'),self.hold_log('nan','0'),
+              self.hold_log('0.01','0'),self.hold_log('-0.02','-0.01'),self.hold_log('-0.01','0'),
+              self.hold_log()+self.hold_log(),self.hold_log().replace('time 1ns','time 1ns\ntime 1ps'),self.hold_log().replace('VERIEDA_REPORT_END hold_tns','')]
+        for log in logs:
+            with self.subTest(log=log):self.assertEqual(observe_hold(0,log)['observation'],'HOLD_REPORT_FORMAT')
+    def test_hold_collector_keeps_exact_validated_initialization_and_supported_min_commands(self):
+        import zipfile
+        from verieda.sta_min import build_hold_script
+        from test_case import NATIVE
+        script=build_hold_script()
+        self.assertTrue(script.startswith((ROOT/'acceptance/sta.tcl').read_bytes()))
+        self.assertIn(b'report_wns -min -digits 9',script);self.assertIn(b'report_tns -min -digits 9',script)
+        self.assertIn(b'report_checks -path_delay min',script)
+        with zipfile.ZipFile(NATIVE) as z:
+            help_text=z.read('final-acceptance/output/sta/tool.log')
+        self.assertIn(b'report_wns [-min] [-max]',help_text)
+        self.assertIn(b'report_tns [-min] [-max]',help_text)
+    def test_optional_bound_hold_status_is_observed_without_final_pass(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=pathlib.Path(d);self.fixture(p,{
+                'final-acceptance/output/sta/hold.log':self.hold_log('-0.01','-0.03'),
+                'final-acceptance/output/sta/hold.log.status.json':'{"return_code":0}'})
+            r=self.inspect(p);self.assertEqual(r['hold_observation']['hold_gate'],'FAIL')
+            self.assertFalse(r['validation_coverage']['can_certify_full_final_acceptance'])
     def test_changed_payload_fails_integrity_before_observations(self):
         with tempfile.TemporaryDirectory() as d:
             p=pathlib.Path(d);self.fixture(p);(p/'final-acceptance/output/sta/wns.rpt').write_text('wns max 1')
