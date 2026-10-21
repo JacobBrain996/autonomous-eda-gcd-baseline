@@ -14,6 +14,7 @@ from .formal_runtime import execute_formal
 from .formal_review import inspect_formal
 from .triage import diagnose
 from .decision import decide
+from .timing import explain_timing
 
 def read(path,limit):
     p=Path(path)
@@ -35,6 +36,8 @@ def main():
     p.add_argument('reference');p.add_argument('candidate')
     p=sub.add_parser('observe-formal',help='classify a log; does not certify proof or witness')
     p.add_argument('log');p.add_argument('--return-code',required=True,type=int)
+    p=sub.add_parser('explain-timing',help='rank checked saved worst-path contributions; no EDA or causal claim')
+    for part in ('profile','smoke','acceptance'):p.add_argument('--'+part,required=True)
     p=sub.add_parser('decide',help='join reference, candidate and verification evidence into one offline next action; never executes')
     for part in ('profile','smoke','acceptance'):p.add_argument('--'+part,required=True)
     p.add_argument('--budget-seconds',type=int,default=0,help='remaining native budget, excludes setup/billing')
@@ -79,7 +82,10 @@ def main():
     p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
     args=parser.parse_args()
     try:
-        if args.command=='decide':
+        if args.command=='explain-timing':
+            case=load_case(read_json(args.profile),args.smoke,args.acceptance)
+            state=explain_timing(case);rc=0 if state['contribution_gate']=='PASS_ARITHMETIC_CHECK' else 2
+        elif args.command=='decide':
             case=load_case(read_json(args.profile),args.smoke,args.acceptance)
             after_args=(args.after_profile,args.after_smoke,args.after_acceptance)
             if any(after_args) and not all(after_args):raise ValueError('complete after profile/Smoke/acceptance inputs required')

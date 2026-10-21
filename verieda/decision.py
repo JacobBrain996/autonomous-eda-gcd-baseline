@@ -11,6 +11,7 @@ from .policy import propose
 from .action_results import inspect_action
 from .verification import review_candidate
 from .triage import diagnose
+from .timing import explain_timing
 
 NEXT={
  'VERIFY_PENDING_CANDIDATE':'PREPARE_VERIFICATION_REQUEST',
@@ -83,13 +84,15 @@ def decide(state,budget_seconds=0,result=None,expected_sha256=None,
    'trust':'source hashes for replay; not a code audit or execution attestation'},
   'reference_provenance':copy.deepcopy(state.get('provenance',{})),
   'reference':copy.deepcopy({k:state[k] for k in ('design','platform','gates','metrics','formal','timing_analysis')}),
-  'history':history,'proposal':None,'candidate':None,'action_observation':None,'failure':None,'issues':[],
+  'timing_explanation':explain_timing(state),'history':history,'proposal':None,'candidate':None,'action_observation':None,'failure':None,'issues':[],
   'next_action':'HOLD_EVIDENCE','execution_authorized':False,'design_acceptance':'NOT_EVALUATED',
   'project_status':'NOT_EVALUATED','budget':{'unspent_native_seconds':available,'monetary_cost':None,
    'scope':('total supplied action history plus supplied current Formal and future native budget' if action_history is not None else 'caller supplied remaining native budget')+'; excludes unsupplied runs, setup, queue and billing; no automatic reservation'},
   'trust':'supplied evidence snapshot only; caller must authenticate profiles, hashes and execution; no global experiment inventory'}
  if history_issue is not None:
   report['issues'].append(history_issue)
+ elif result is None and report['timing_explanation']['contribution_gate']=='HOLD':
+  report['issues'].append('worst-path trace inconsistent; no new optimization proposal')
  elif result is None:
   report['proposal']=control
   selected=control['selected_candidate']

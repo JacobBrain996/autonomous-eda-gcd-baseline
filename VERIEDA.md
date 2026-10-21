@@ -20,7 +20,7 @@ Inspection checks exact state/candidate binding, fixed Make argv, effective valu
 
 `advance-action` reads the pinned ZIP itself; it cannot accept an agent-written observation as proof. It returns updated bounded history and budget, does not modify source/history files, and never executes a workflow. Save its `history` array for subsequent `--history FILE` use. Re-reading the same result is idempotent; conflicting records require HOLD. A completed synthesis creates an UNKNOWN adoption outcome and VERIFY_PENDING_CANDIDATE, with new-netlist Formal/physical/timing/constraint/adoption checks NOT_RUN. It does not reuse the old final-netlist proof for the new design. Failures enter STOP_REVIEW_FAILURE, exhausted budget STOP_BUDGET, unexecuted actions AWAIT_SEPARATE_EXECUTION_AUTHORIZATION. No implicit retry or budget expansion occurs.
 
-Real EDA efficacy, authenticated remote receipt integration and full native action validation remain NOT_RUN. Successful/failed native process fixtures in tests are explicitly synthetic. The local end-to-end demonstration uses the actual default NOT_RUN response, not a fabricated successful EDA run.
+Native synthesis integration has executed once in Run 39571841412 and produced the speed-mapped netlist/ODB. Candidate functional equivalence and final physical/timing acceptance remain unverified; Formal Run 39593539830 failed during adapter preparation before proof. Historical successful/failed process fixtures in tests are synthetic and must not be confused with either real run.
 
 The frozen GCD config explicitly sets ABC_AREA=1; retained Smoke `1_2_yosys.log` confirms `Using ABC area script.`. The pinned synth preamble selects `abc_speed.script` when ABC_AREA=0. `verieda/action_support.json` records exact public source SHA256, frozen image and core binaries; source bytes were checked against GitHub's frozen-commit Git blob IDs. This establishes an actual parameter change, not a no-op or measured benefit.
 
@@ -277,3 +277,28 @@ skipped on Windows. Regression also preserved structured rejection of missing
 package files. Python syntax, source package hashes and diff checks passed.
 Frozen RTL/SDC/ORFS/image, original artifacts and remote state were not modified;
 no push, dispatch or EDA execution occurred.
+
+
+## Offline worst-path explanation
+
+`python -m verieda explain-timing --profile cases/gcd.json --smoke SMOKE.zip --acceptance ACCEPTANCE.zip`
+loads the same pinned evidence as `decide`. `decide` also embeds this explanation,
+bound to its reference state and final netlist SHA; it is not candidate timing.
+The interpreter separates clock/data increments, checks cell/net sums against
+saved path totals (1e-6 ns tolerance) and ranks five cell and net arcs by measured
+increment. Counts are arcs, not inferred logic depth. No STA or ECO is executed.
+
+PASS_ARITHMETIC_CHECK is only consistency of the saved trace; Timing stays FAIL.
+Missing trace is NOT_AVAILABLE. Invalid/oversized/unsupported traces HOLD, and
+inconsistent present trace prevents a new optimization proposal. The scope is
+one reported worst path, not coverage of all endpoints or slack reconstruction.
+The real trace gives cell 0.357314038 ns, net 0.002443143 ns and 14 data cell arcs;
+its largest cell increment is the launch-instance DFF_X1 arc, 0.104474753 ns.
+This does not prove an RTL cause, a legal replacement or expected QoR improvement.
+Slew/load/fanout, equivalent library choices and downstream hold/parasitic impact
+remain explicit prerequisites. Cross-design point-format tests are synthetic.
+
+Local checkpoint: 243 tests, 242 passed and one Linux integration skipped.
+Package hashes, Python syntax, real CLI output and diff checks passed. The pending
+publication/one-run authorization still names b19cc94; this increment is local
+and is not implicitly included in that approval request.
