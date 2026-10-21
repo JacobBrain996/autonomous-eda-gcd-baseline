@@ -9,7 +9,7 @@
     "acceptance/snapshot.tcl": "b699b0a9879e30eb4bbeddc5e2dc0478976177128bb36a681f77314ae3bf99ca",
     "acceptance/miter.v": "6f0f4600f2a8004427e8381d39c246306de54754b5993bbcdd55180c5097d824",
     "verieda/__init__.py": "a5131213bc9b02b10a9d50568d581abfee1f56a13abcd928563dfd9e34093b28",
-    "verieda/__main__.py": "bb2e3b5ba9b7662cc3fb2ff66b58666917a684ad670891e3d8c6c97c94d6a75c",
+    "verieda/__main__.py": "6df1376d410ca3bf418aedbb4395b624252b2e8128e76c34fe054d4e9acd70b0",
     "verieda/constraints.py": "d76eab2cb9a3a0cb4108ef28d02d3253b7247da9eabed03453028e57cab0218f",
     "verieda/evidence.py": "24b7c0e7e4b12b7ec3479655c0d4868306e86fe1dcc49485448383527e11d777",
     "verieda/formal.py": "e8710f48c6f589c4299e4b3477fffa6225b0888665e2a1a2d22ba93f4f9b8fa4",
@@ -27,7 +27,15 @@
     "verieda/liberty.py": "61ffbb6fedd5e55bfe476730e08e988dda5f19e9c3bb98bbcd36a3e5b96d90a1",
     "tests/test_liberty_subset.py": "6a60a251ab2badc09df6e0dbee8e1f48c77004efb9e18a07fc05892752b40e6a",
     "verieda/invariants.py": "5d38214a74b7e7924e67fe4ab6981c20bf46e238072cf85e09d7b5e0690d4b4a",
-    "tests/test_invariants.py": "63b2173738539ac59840fb83c828c66e27a87b939f1e166c6c6e7966a207943a"
+    "tests/test_invariants.py": "63b2173738539ac59840fb83c828c66e27a87b939f1e166c6c6e7966a207943a",
+    "verieda/case.py": "8b6ea9b0c648bb541d2d2241be3e02831c93dca9239f2477686d9c44cfe16b58",
+    "verieda/policy.py": "71732979af92a59eb1ccbb5ae21f3da10a3146cade77d6bf014656e502f2509b",
+    "verieda/adoption.py": "f0e91d49bce9f5bc163ef8f949a305a5885d099269d48c41889fb097c82580bd",
+    "tests/test_case.py": "4af02a633cef9f6735fe313888893bba40c8aae01bee5447b2d7ff17468c73f0",
+    "tests/test_policy.py": "05e52436c7b36df132cf2747b7b6d0aaa82edb2a0c7bb0135bb750efe164dcf8",
+    "tests/test_adoption.py": "89447e31d97f588d93ae6bf545994a377a07e90c838d9121c3efcd20afc870f1",
+    "tests/test_v0_cli.py": "ea61d8245293f6c3decb5be604a504764d285e38f013932b650fac3265486fae",
+    "cases/gcd.json": "6c0374ef9ed36147e85690d2f92e79f2591782748dcf346f8c891d1e9344bea6"
   },
   "scope": "existing final netlist only; no physical optimization; no baseline promotion",
   "authorization_boundary": "Integrity manifest only; this file does not authorize push or dispatch."

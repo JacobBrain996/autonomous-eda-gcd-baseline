@@ -4,6 +4,9 @@ from .evidence import inspect
 from .constraints import compare_sdc
 from .formal import observe_yosys
 from .native import inspect_acceptance
+from .case import load_case,read_json
+from .policy import propose
+from .adoption import evaluate
 
 def read(path,limit):
     p=Path(path)
@@ -23,9 +26,23 @@ def main():
     p.add_argument('reference');p.add_argument('candidate')
     p=sub.add_parser('observe-formal',help='classify a log; does not certify proof or witness')
     p.add_argument('log');p.add_argument('--return-code',required=True,type=int)
+    p=sub.add_parser('plan',help='load pinned evidence and propose legal bounded actions; no execution')
+    p.add_argument('--profile',required=True);p.add_argument('--smoke',required=True);p.add_argument('--acceptance',required=True)
+    p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
+    p=sub.add_parser('evaluate',help='independently compare before/after evidence; never trusts policy success')
+    for side in ('before','after'):
+        for part in ('profile','smoke','acceptance'):p.add_argument('--'+side+'-'+part,required=True)
+    p.add_argument('--candidate',required=True)
     args=parser.parse_args()
     try:
-        if args.command=='inspect':
+        if args.command=='plan':
+            case=load_case(read_json(args.profile),args.smoke,args.acceptance)
+            state={'state':case,'decision':propose(case,args.budget_seconds,read_json(args.history) if args.history else [])};rc=0
+        elif args.command=='evaluate':
+            before=load_case(read_json(args.before_profile),args.before_smoke,args.before_acceptance)
+            after=load_case(read_json(args.after_profile),args.after_smoke,args.after_acceptance)
+            state=evaluate(before,after,read_json(args.candidate));rc=0
+        elif args.command=='inspect':
             state=inspect(args.artifact,args.expect,args.expected_sha256)
             rc=2 if state['gates']['evidence']=='FAIL' else 0
         elif args.command=='inspect-acceptance':

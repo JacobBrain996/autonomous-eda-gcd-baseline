@@ -1,5 +1,29 @@
 # VeriEDA — executable core and development checkpoint
 
+## V0 software checkpoint — 2026-10-21 (supersedes historical status below)
+
+The native acceptance Run 39544704950 at bbf5c1d proved final-netlist sequential equivalence for **two common synchronous reset edges followed by arbitrary defined inputs, all 18 output bits**. Timing still fails (WNS -0.1615832 ns, TNS -7.086462975 ns, 51 endpoints); full constraint coverage is UNKNOWN. These are independent engineering tasks, not prerequisites for software development. Historical checkpoints below remain an execution record, not current authority.
+
+The V0 CLI now joins pinned Smoke/acceptance archives, proposes bounded candidates using an explainable rule policy, and evaluates candidate adoption separately:
+
+```powershell
+python -m verieda plan --profile cases/gcd.json --smoke evidence/smoke-9644bb3f8ed4/NO_LEC_SMOKE-38226418563.zip --acceptance evidence/final-acceptance-bbf5c1de8b7c/acceptance-39544704950.zip --budget-seconds 600
+python -m verieda plan --help
+python -m verieda evaluate --help
+```
+
+`cases/gcd.json` is an **external operator-reviewed trust profile**, not an agent-generated certificate. It pins archive/run/input identity and the previously reviewed proof files. Reusing that review does not rerun Formal or authenticate an arbitrary new run. Remove the review and Formal stays UNKNOWN with an unbounded-proof observation. Do not copy its review onto another candidate or treat profile checksum consistency as cryptographic attestation. All generated state/decision/candidate content is hash-bound; these hashes detect mutation, not a malicious operator rewriting a trust root.
+
+`plan` emits JSON containing state and decision; save stdout if desired. Optional `--history FILE` accepts at most 100 caller-recorded outcomes with exactly `state_id`, `candidate_id`, `outcome` (FAIL/UNKNOWN/TIMEOUT/ERROR/REJECTED/ACCEPTED), and nonnegative `runtime_seconds`. It is a bounded local history, not GitHub billing or authorization. A consumed candidate is not retried automatically. A 600-second candidate cap requires 600 unspent seconds; anything less stops cloud proposal selection while offline constraint review remains available. Default budget is zero. No candidate, history field or CLI exit code authorizes execution.
+
+The first action space contains a timing-oriented mapping hypothesis (`ABC_AREA=0`, only after verifying the existing value and frozen tool support) and a bounded critical-cell/buffering investigation. Cell/net delay determines ranking, not guaranteed causality or gain. These proposals have legality checks, immutable protected identities, rollback/preparation requirements and independent verifier requirements. Both remain `execution_ready=false`: application/remote adapters are not yet implemented. No EDA run, parameter edit or optimization gain is claimed. Missing constraint coverage does not block planning but does block acceptance.
+
+`evaluate` loads before/after evidence with separate `--before-profile/--before-smoke/--before-acceptance` and `--after-profile/--after-smoke/--after-acceptance`, plus `--candidate FILE`. It refuses the same artifact/netlist as a new experiment. Acceptance requires unchanged frozen design/tools/original constraints, an artifact-bound `output/action-execution.json` receipt matching the candidate/base/changes and return code zero, same complete proof contract, all required gates, positive WNS improvement with no negative setup slack, and at most 10% area overhead. Missing receipt or coverage gives INCONCLUSIVE; contradictory evidence gives REJECTED. Current evidence cannot be accepted as a new optimization. The generic case adapter deliberately cannot certify full constraints or timing coverage from partial data, so genuinely ACCEPTED real candidates still need those verifier adapters. Synthetic acceptance tests are unit tests, not EDA efficacy evidence.
+
+Exit 0 means the command completed, **not** design/candidate PASS. Inspect `decision`, `verdict`, `gates` and missing checks. Exit 2 means malformed/missing evidence/config. No dependencies, API keys, UI or LLM service are required. The rule policy is a reproducible control for future optimizer comparisons; novelty and autonomous optimization efficacy remain NOT_ESTABLISHED.
+
+Design and task ledger: `docs/superpowers/specs/2026-10-21-verieda-v0.md`, `docs/superpowers/plans/2026-10-21-verieda-v0.md`. Remaining substantive work: executable isolated action adapter, trusted execution receipts, constraint/hold/physical coverage, real controlled improvement/adaptation, and more designs. The project Goal remains active.
+
 VeriEDA targets an evidence-backed Design → Analyze → Reason → Optimize → Execute → Verify → Adapt loop. The research objective is active and is not complete. No novelty or successful autonomous optimization is claimed.
 
 ## Working software now

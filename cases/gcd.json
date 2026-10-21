@@ -1,0 +1,30 @@
+{
+  "schema": "verieda.case-profile.v1",
+  "design": "gcd",
+  "platform": "nangate45",
+  "smoke": {"run_id": "38226418563", "commit": "9644bb3f8ed42bb3d5f23acc267e1235bc089496", "sha256": "7dbdda5dd2e4d3edff841cda2bf2f7ab26099272d3bec4a0294a57e807001d84"},
+  "acceptance": {"run_id": "39544704950", "commit": "bbf5c1de8b7c4ad07531e72c7226b0e14e439944", "sha256": "58b83ba6a4253323b5f3768197c1b7e832bbe5faebc09c3f8071d46b25fc6566"},
+  "frozen": {
+    "orfs_commit": "3a964e13f11a4e435aac01ffa14db0a7d2853720",
+    "orfs_image": "openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9",
+    "rtl_sha256": "5009f224876d39e5e77e59ee1528cb0d2a03697251f0971b77cf3e8b0426dd3e",
+    "sdc_sha256": "952a1a0a6de30877f585ee924004ce66151ff8325ec77e274fd92d1fdbf36582"
+  },
+  "inputs": {
+    "6_final.odb": "2707181d3787009955eeb245acfc02fffd3e5c570c8e391aa6b1d2502fa415c4",
+    "6_final.sdc": "112a077b756cada0fab67b2061733207a9cd7ac99b3e98454cabcad5aec7aa77",
+    "6_final.v": "0d95240b149d075713b919c9bc3d059e296272da95331dc25635ff17016eed9a",
+    "6_report.json": "c4504e958b01244433e2acb7a6de89ffe45acd108370cb6e43bf79275d0706fd"
+  },
+  "formal_review": {
+    "verdict": "PASS_RESET_CONTRACT_UNBOUNDED",
+    "contract": "two common synchronous reset edges; all 18 output bits for arbitrary future defined inputs",
+    "provenance": "Run 39544704950 independent binding/property audit; evidence/final-acceptance-bbf5c1de8b7c/NATIVE_ACCEPTANCE_RESULT.md",
+    "files": {
+      "formal/proof.log": "c350f8adbf80704bc75b0f743a56c7e4b69791f9020f8f5d45433a152a781864",
+      "formal/prove.ys": "e6a20dbcb98c6f205395c601102fde77a9dc737bda3b8bcdfc788e517ab846b3",
+      "formal/miter.il": "4bc83b0b7c6fa1c3165311e8527315319a2ee0a30cf48005a2c15ae8f1b43cd9",
+      "formal/strengthened_miter.il": "ad2d23900ad45a9652ce5f52ad20db2ad45eb36bd9de27f662c1eced38343034"
+    }
+  }
+}
