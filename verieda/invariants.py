@@ -20,7 +20,8 @@ RELATION=b'''module verieda_state_relation(
 endmodule
 '''
 
-def strengthen_miter(il,model_json):
+def strengthen_miter(il,model_json,boot_name='boot'):
+    if not isinstance(boot_name,str) or not re.fullmatch('[A-Za-z_][A-Za-z0-9_]*',boot_name):raise ValueError('HOLD unsupported boot alias')
     if not isinstance(il,bytes) or not isinstance(model_json,bytes) or max(len(il),len(model_json))>16*1024*1024:raise ValueError('HOLD miter input budget/type')
     text=il.decode('utf-8');obj=json.loads(model_json)
     if set(obj.get('modules',{}))!={'acceptance_miter'} or not text.endswith('\nend\n') or re.findall(r'(?m)^module ([^\n]+)',text)!=['\\acceptance_miter']:raise ValueError('HOLD unsupported miter structure')
@@ -45,7 +46,7 @@ def strengthen_miter(il,model_json):
         if (int(size[1]) if size else 1)!=width:raise ValueError('HOLD RTLIL/JSON width mismatch')
         if state and any(bit not in owners for bit in bits):raise ValueError('HOLD alias is not a state Q')
         return {'name':name,'bits':bits,'drivers':[owners[bit] for bit in bits] if state else []}
-    bindings={'boot':[signal('boot',2)],'gold_state':[signal('gold.ctrl.state.out',2)],
+    bindings={'boot':[signal(boot_name,2)],'gold_state':[signal('gold.ctrl.state.out',2)],
       'gold_a':[signal('gold.dpath.a_reg.out',16)],'gold_b':[signal('gold.dpath.b_reg.out',16)],
       'gate_state':[signal(f'gate.ctrl.state.out[{i}]$_DFF_P_.Q',1) for i in range(3)],
       'gate_a':[signal(f'gate.dpath.a_reg.out[{i}]$_DFFE_PP_.Q',1) for i in range(16)],

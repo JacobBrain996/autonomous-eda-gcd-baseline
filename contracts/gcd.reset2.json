@@ -1,0 +1,26 @@
+{
+  "schema": "verieda.reset-contract.v1",
+  "top": "gcd",
+  "description": "two common synchronous reset edges; all 18 output bits for arbitrary future defined inputs",
+  "rtl_sha256": "5009f224876d39e5e77e59ee1528cb0d2a03697251f0971b77cf3e8b0426dd3e",
+  "clock": "clk",
+  "reset": "reset",
+  "reset_active": 1,
+  "reset_edges": 2,
+  "inputs": {
+    "clk": 1,
+    "reset": 1,
+    "req_val": 1,
+    "resp_rdy": 1,
+    "req_msg": 32
+  },
+  "outputs": {
+    "req_rdy": 1,
+    "resp_val": 1,
+    "resp_msg": 16
+  },
+  "rtl_path": "flow/designs/src/gcd/gcd.v",
+  "sdc_path": "flow/designs/nangate45/gcd/constraint.sdc",
+  "library_path": "flow/platforms/nangate45/lib/NangateOpenCellLibrary_typical.lib",
+  "strengthening": "gcd-state-v1"
+}

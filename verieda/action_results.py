@@ -167,6 +167,12 @@ def advance_action(state,artifact,expected_sha256,budget_seconds=0,history=None)
             if observation['status']=='SYNTHESIS_COMPLETED':
                 result['pending_verifiers']={k:'NOT_RUN' for k in ('formal_new_netlist','physical_flow','setup_hold','constraint_coverage','independent_adoption')}
                 result['decision']='VERIFY_PENDING_CANDIDATE' if result['budget']['remaining_seconds']>0 else 'STOP_BUDGET'
+                from .verification import load_subject,plan_verification
+                try:
+                    subject=load_subject(state,artifact,expected_sha256)
+                    result['verification_handoff']=plan_verification(subject,int(result['budget']['remaining_seconds']))
+                except (ValueError,OSError,KeyError,TypeError,UnicodeError) as ex:
+                    result['verification_handoff']={'decision':'HOLD_VERIFICATION_PREPARATION','reason':str(ex),'execution_authorized':False}
             else:result['decision']='STOP_REVIEW_FAILURE'
     elif observation['status']=='NOT_RUN':result['decision']='AWAIT_SEPARATE_EXECUTION_AUTHORIZATION'
     result['feedback_id']=digest(result)

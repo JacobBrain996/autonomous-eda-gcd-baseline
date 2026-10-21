@@ -9,6 +9,8 @@ from .policy import propose
 from .adoption import evaluate
 from .execution import prepare_action,execute_action
 from .action_results import seal_action,inspect_action,advance_action
+from .verification import load_subject,plan_verification,prepare_verification,verify_verification_package,review_candidate
+from .formal_runtime import execute_formal
 
 def read(path,limit):
     p=Path(path)
@@ -31,6 +33,20 @@ def main():
     p=sub.add_parser('plan',help='load pinned evidence and propose legal bounded actions; no execution')
     p.add_argument('--profile',required=True);p.add_argument('--smoke',required=True);p.add_argument('--acceptance',required=True)
     p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
+    p=sub.add_parser('inspect-verification',help='check materialized verifier inputs, never design PASS')
+    p.add_argument('package')
+    p=sub.add_parser('execute-formal',help='bound candidate Formal; default NOT_RUN, Linux and separate execution authorization required')
+    for part in ('package','contract','frozen-root','work'):p.add_argument('--'+part,required=True)
+    p.add_argument('--execute',action='store_true');p.add_argument('--image-identity')
+    for command in ('verify-next','prepare-verification','review-candidate'):
+        p=sub.add_parser(command,help='evidence-bound independent verification handoff; no EDA execution')
+        for part in ('profile','smoke','acceptance','result','expected-sha256'):p.add_argument('--'+part,required=True)
+        p.add_argument('--budget-seconds',type=int,default=0,help='unspent native verification seconds, excluding setup/billing')
+        if command=='prepare-verification':p.add_argument('--output',required=True)
+        else:
+            p.add_argument('--formal-result');p.add_argument('--formal-sha256')
+            if command=='review-candidate':
+                for part in ('profile','smoke','acceptance'):p.add_argument('--after-'+part)
     p=sub.add_parser('evaluate',help='independently compare before/after evidence; never trusts policy success')
     for side in ('before','after'):
         for part in ('profile','smoke','acceptance'):p.add_argument('--'+side+'-'+part,required=True)
@@ -49,7 +65,26 @@ def main():
     p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
     args=parser.parse_args()
     try:
-        if args.command=='advance-action':
+        if args.command=='execute-formal':
+            state=execute_formal(args.package,args.contract,args.frozen_root,args.work,args.execute,
+                                 read_json(args.image_identity,65536) if args.execute and args.image_identity else None)
+            rc=0 if state['status'] in ('NOT_RUN','UNBOUNDED_PROOF_REPORTED') else 2
+        elif args.command=='inspect-verification':
+            state=verify_verification_package(args.package);rc=0
+        elif args.command in ('verify-next','prepare-verification','review-candidate'):
+            case=load_case(read_json(args.profile),args.smoke,args.acceptance)
+            if args.command=='review-candidate':
+                after_args=(args.after_profile,args.after_smoke,args.after_acceptance)
+                if any(after_args) and not all(after_args):raise ValueError('complete after profile/Smoke/acceptance inputs required')
+                after=load_case(read_json(args.after_profile),args.after_smoke,args.after_acceptance) if all(after_args) else None
+                state=review_candidate(case,args.result,args.expected_sha256,args.budget_seconds,args.formal_result,args.formal_sha256,after)
+            elif args.command=='prepare-verification':
+                state=prepare_verification(case,args.result,args.expected_sha256,args.output,args.budget_seconds)
+            else:
+                subject=load_subject(case,args.result,args.expected_sha256)
+                state=plan_verification(subject,args.budget_seconds,args.formal_result,args.formal_sha256)
+            rc=2 if state.get('decision')=='HOLD_VERIFIER_EVIDENCE' or state.get('candidate_status')=='EVIDENCE_HOLD' else 0
+        elif args.command=='advance-action':
             case=load_case(read_json(args.profile),args.smoke,args.acceptance)
             state=advance_action(case,args.result,args.expected_sha256,args.budget_seconds,read_json(args.history) if args.history else [])
             rc=2 if state['observation']['evidence_gate']=='FAIL' else 0
