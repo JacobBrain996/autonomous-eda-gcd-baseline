@@ -3,7 +3,7 @@
   "self_excluded": true,
   "files": {
     ".github/workflows/final_netlist_acceptance.yml": "5219380183c2ea90ab464a46ca7945c3538fc0d6df63b0b633d3cd2fc9e37c27",
-    "acceptance/verify.py": "e5536e4e5fa8706275c2b3e1bafe5b99d73a879033d999835dd9060a2cc7b64f",
+    "acceptance/verify.py": "9328975de8055e19b7487f958d5f4812b178f3267a2c615b76d6429d1b5f3379",
     "acceptance/run.sh": "44c094fef375fd2e4485d71cde25fe2f7eb99824ea4af3d7a79b1587ed4f33e6",
     "acceptance/sta.tcl": "a9c229f68be41f53193a89a3c1e61b27ce83e5d1c2ca4f749a4cba5ac255133d",
     "acceptance/snapshot.tcl": "b699b0a9879e30eb4bbeddc5e2dc0478976177128bb36a681f77314ae3bf99ca",
@@ -20,7 +20,10 @@
     "tests/test_native_evidence.py": "727503f08ea0028f0ff5ec1b1529143bf3b27444cf5620496ebb84b6a3c7db5c",
     "tests/test_adapter_repair.py": "9f528f87598c7fd314f21c732831f0e91eea04d7bcd92cdcda210cf0c396518f",
     "tests/fixtures/yosys_sat_help_39451358576.txt": "75d5edc5ba6457ee1f188b2fe9b849940b637d27722ced8e01e5f2d06db95578",
-    "tests/fixtures/.gitattributes": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9"
+    "tests/fixtures/.gitattributes": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9",
+    "tests/test_path_segments.py": "44db65435eda4a414598bab14adf516a93b9116a2f2c0c03270ded4e5e2a5afa",
+    "tests/fixtures/worst_setup_39531565936.txt": "f7b6eaba4227e27d4aba41b27b78db1d37670ae6813dd0437f3b2898357a1be8",
+    "tests/fixtures/nangate_pin_directions_39531565936.tsv": "fb2d8a6470360f9d8180b8fae1bd0ad5325e803c90dc421255ac845620b623b3"
   },
   "scope": "existing final netlist only; no physical optimization; no baseline promotion",
   "authorization_boundary": "Integrity manifest only; this file does not authorize push or dispatch."

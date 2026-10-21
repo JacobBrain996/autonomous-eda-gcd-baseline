@@ -212,7 +212,14 @@ def parse_sta_paths(text,models):
         points=[];data=False;ended=False
         start=block.splitlines()[0].split(' (')[0].strip()
         for line in block.splitlines():
-            if 'input external delay' in line or re.search(r'\(in\)$',line.strip()):data=True
+            if 'input port' in block.splitlines()[0] and 'input external delay' in line:data=True
+            port=re.search(r'([\^v])\s+(\S+)\s+\((in|out)\)',line)
+            if port:
+                _,name,direction=port.groups()
+                if direction=='in' and name==start:data=True
+                if direction=='out' and name==endpoint and data and not ended:
+                    nums=re.findall(r'[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?',line[:port.start()])
+                    points.append({'instance':name,'pin':name,'cell':None,'increment_ns':float(nums[-2]),'arc':'net','segment':'data','kind':'port'})
             if 'data arrival time' in line:ended=True
             hit=re.search(r'([\^v])\s+(\S+)/(\S+)\s+\((\S+)\)',line)
             if not hit:continue
@@ -222,7 +229,7 @@ def parse_sta_paths(text,models):
             direction=models[cell]['ports'][pin]['direction']
             if direction not in ('input','output'):raise ValueError('HOLD ambiguous path pin direction')
             points.append({'instance':inst,'pin':pin,'cell':cell,'increment_ns':delay,'arc':'net' if direction=='input' else 'cell','segment':'data' if data and not ended else 'clock'})
-        if not points:raise ValueError('HOLD missing path delay details')
+        if not points or not data:raise ValueError('HOLD missing path delay details/launch boundary')
         paths.append({'startpoint':start,'endpoint':endpoint,'group':group,'slack_ns':slack,'points':points,
             'data_cell_delay_ns':sum(p['increment_ns'] for p in points if p['segment']=='data' and p['arc']=='cell'),
             'data_net_delay_ns':sum(p['increment_ns'] for p in points if p['segment']=='data' and p['arc']=='net')})
