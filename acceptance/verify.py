@@ -4,6 +4,7 @@ from pathlib import Path, PurePosixPath
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from verieda.formal import observe_yosys
 from verieda.constraints import compare_sdc
+from verieda.liberty import subset_liberty
 
 class FormalCounterexample(RuntimeError):pass
 
@@ -84,6 +85,10 @@ def require_models(used,models):
             ins={b for p in ports.values() if p['direction']=='input' for b in p['bits']}
             outs=[b for p in ports.values() if p['direction']=='output' for b in p['bits']]
             if not outs or any(b not in ins and b not in ('0','1') for b in outs):raise ValueError('HOLD empty/unconnected functional model '+c)
+def require_model_closure(discovered,used,models):
+    if set(used)!=set(discovered) or set(models)!=set(discovered):raise ValueError('HOLD functional model/link/discovery closure differs')
+    require_models(set(used),models)
+
 def require_sta_identity(wns,tns,count):
     if not math.isfinite(wns) or not math.isfinite(tns):raise ValueError('HOLD nonfinite STA result')
     if abs(wns+0.161583)>5e-6 or abs(tns+7.08646)>5e-6 or count!=51: raise ValueError('HOLD reconstructed STA does not match Smoke')
@@ -148,7 +153,22 @@ def formal():
     helptext=(d/'capabilities.log').read_text(errors='replace')
     if rc:raise ValueError('HOLD Yosys help return code '+str(rc))
     require_proof_capabilities(helptext)
-    lib='/frozen/flow/platforms/nangate45/lib/NangateOpenCellLibrary_typical.lib'
+    frozen_lib=Path('/frozen/flow/platforms/nangate45/lib/NangateOpenCellLibrary_typical.lib')
+    # Discover the complete instance-type set without importing any library.
+    discover='read_verilog /inputs/6_final.v\nwrite_json /work/formal/unlinked.json\n'
+    (d/'discover.ys').write_text(discover,encoding='utf-8')
+    if run([YOSYS,'-Q','-T','-s',str(d/'discover.ys')],d/'discover.log',min(15,budget())):raise ValueError('HOLD final netlist cell discovery')
+    modules=json.loads((d/'unlinked.json').read_text(encoding='utf-8'))['modules']
+    if set(modules)!={'gcd'}:raise ValueError('HOLD unexpected netlist module closure')
+    discovered={c['type'] for c in modules['gcd']['cells'].values()}
+    if len(discovered)!=39:raise ValueError('HOLD unexpected discovered cell coverage')
+    raw=frozen_lib.read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=SOURCES['platforms/nangate45/lib/NangateOpenCellLibrary_typical.lib']:raise ValueError('HOLD functional library source identity')
+    derived,selection=subset_liberty(raw,discovered)
+    lib=str(d/'functional-used.lib')
+    with Path(lib).open('xb') as f:f.write(derived)
+    selection.update(netlist_sha256=sha('/inputs/6_final.v'),discovery_json_sha256=sha(d/'unlinked.json'),engine_sha256=sha(YOSYS))
+    write(d/'library-selection.json',selection)
     prep=f'''read_liberty {lib}
 write_json /work/formal/models.json
 design -reset
@@ -179,9 +199,11 @@ write_rtlil /work/formal/miter.il
     if sha(d/'gold.il')==sha(d/'gate.il'):raise ValueError('HOLD gold and gate normalized identities unexpectedly identical')
     linked=json.loads((d/'gate_linked.json').read_text())['modules']['gcd']
     used={c['type'] for c in linked['cells'].values()}
-    models=json.loads((d/'models.json').read_text())['modules'];require_models(used,models)
+    models=json.loads((d/'models.json').read_text())['modules']
+    require_model_closure(discovered,used,models)
     if len(used)!=39:raise ValueError('HOLD unexpected cell coverage')
     expected={'clk':('input',1),'reset':('input',1),'req_val':('input',1),'resp_rdy':('input',1),'req_msg':('input',32),'req_rdy':('output',1),'resp_val':('output',1),'resp_msg':('output',16)}
+    if set(linked['ports'])!=set(expected):raise ValueError('HOLD unexpected top ports')
     for n,(direction,width) in expected.items():
         if linked['ports'][n]['direction']!=direction or len(linked['ports'][n]['bits'])!=width:raise ValueError('HOLD top interface')
     top=json.loads((d/'miter.json').read_text())['modules']['acceptance_miter'];clock=top['ports']['clk']['bits']
@@ -190,7 +212,7 @@ write_rtlil /work/formal/miter.il
         if 'dff' in c['type'].lower():
             if c['connections'].get('CLK',c['connections'].get('C'))!=clock or c['type']=='$_DFF_N_':raise ValueError('HOLD noncommon clock')
             if 'CLK_POLARITY' in c['parameters'] and int(c['parameters']['CLK_POLARITY'],2)!=1:raise ValueError('HOLD negative clock')
-    write(d/'coverage.json',{'functional_cells':sorted(used),'outputs':['req_rdy','resp_val','resp_msg[15:0]'],'output_bits':18,'no_blackbox':True,'common_positive_clock':True})
+    write(d/'coverage.json',{'functional_cells':sorted(used),'outputs':['req_rdy','resp_val','resp_msg[15:0]'],'output_bits':18,'no_blackbox':True,'common_positive_clock':True,'library_selection_sha256':sha(d/'library-selection.json'),'functional_library_sha256':sha(lib),'source_library_sha256':sha(frozen_lib),'closed_used_models':True})
     proof='read_rtlil /work/formal/miter.il\nhierarchy -check -top acceptance_miter\nsat -seq 5 -tempinduct -maxsteps 32 -enable_undef -set-def-inputs -set-init-def -prove mismatch 0 -verify -timeout 30 -show mismatch -show-inputs -show-regs -dump_json /work/formal/counterexample.json\n'
     (d/'prove.ys').write_text(proof)
     rc=run([YOSYS,'-Q','-T','-s',str(d/'prove.ys')],d/'proof.log',budget())

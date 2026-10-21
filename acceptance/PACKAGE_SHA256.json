@@ -3,7 +3,7 @@
   "self_excluded": true,
   "files": {
     ".github/workflows/final_netlist_acceptance.yml": "5219380183c2ea90ab464a46ca7945c3538fc0d6df63b0b633d3cd2fc9e37c27",
-    "acceptance/verify.py": "9328975de8055e19b7487f958d5f4812b178f3267a2c615b76d6429d1b5f3379",
+    "acceptance/verify.py": "c3f07f388951344d89566120d8c4b7e296e622c0922b756c021a8aa333269df7",
     "acceptance/run.sh": "44c094fef375fd2e4485d71cde25fe2f7eb99824ea4af3d7a79b1587ed4f33e6",
     "acceptance/sta.tcl": "a9c229f68be41f53193a89a3c1e61b27ce83e5d1c2ca4f749a4cba5ac255133d",
     "acceptance/snapshot.tcl": "b699b0a9879e30eb4bbeddc5e2dc0478976177128bb36a681f77314ae3bf99ca",
@@ -23,7 +23,9 @@
     "tests/fixtures/.gitattributes": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9",
     "tests/test_path_segments.py": "44db65435eda4a414598bab14adf516a93b9116a2f2c0c03270ded4e5e2a5afa",
     "tests/fixtures/worst_setup_39531565936.txt": "f7b6eaba4227e27d4aba41b27b78db1d37670ae6813dd0437f3b2898357a1be8",
-    "tests/fixtures/nangate_pin_directions_39531565936.tsv": "fb2d8a6470360f9d8180b8fae1bd0ad5325e803c90dc421255ac845620b623b3"
+    "tests/fixtures/nangate_pin_directions_39531565936.tsv": "fb2d8a6470360f9d8180b8fae1bd0ad5325e803c90dc421255ac845620b623b3",
+    "verieda/liberty.py": "61ffbb6fedd5e55bfe476730e08e988dda5f19e9c3bb98bbcd36a3e5b96d90a1",
+    "tests/test_liberty_subset.py": "6a60a251ab2badc09df6e0dbee8e1f48c77004efb9e18a07fc05892752b40e6a"
   },
   "scope": "existing final netlist only; no physical optimization; no baseline promotion",
   "authorization_boundary": "Integrity manifest only; this file does not authorize push or dispatch."

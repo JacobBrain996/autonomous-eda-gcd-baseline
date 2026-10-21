@@ -2,6 +2,23 @@
 
 本报告取代早期 FINAL_NETLIST_ACCEPTANCE_PREPARATION.md 的当前就绪结论；旧报告保留历史版本及当时的SHA，不能用它证明修订代码已经过原生验证。
 
+## Strict used-cell functional library preparation — local only
+
+A bounded structural extractor now preserves selected Liberty cell groups byte-for-byte and removes only unused top-level cell groups. Library/global text, comments, escaped strings, nested groups, ff definitions, pin functions and timing contents are retained. It rejects duplicate/missing cells, unsupported scope, malformed comments/quotes/braces/parentheses, unsafe selection and size/depth excess. define(..., cell, ...) is correctly distinguished from an actual cell group. It is intentionally not a Liberty semantic parser.
+
+The original 6,692,032-byte frozen library contains 135 cells. Offline extraction for the actual pinned final netlist retained 39 complete cell groups, omitted 96 unused groups and produced 636,056 bytes, SHA256 54ee4fb0ff51c15d4e41cbc9982c7d7e3258f3fc1eaae0f6e7a75d61ef1e4b13. Reparse confirms exactly the selected names and identical retained body hashes. CLKGATETST_X1 is omitted because it is not instantiated; no used cell is excluded. Preview/selection evidence is in evidence/final-acceptance-b57565ec3f07/offline-library-preview/. It is NOT_IMPORTED, not a native model PASS or proof.
+
+In the proposed native job, a fresh Yosys process first reads only the frozen final netlist and writes unlinked.json (15 seconds maximum, counted inside the existing 300-second Formal budget). The discovered type set must contain the expected 39 cells in the single gcd module. The helper rechecks the original library SHA, creates functional-used.lib with source/derived/per-cell byte hashes and binds it to the netlist/discovery JSON/engine hashes. Both ordinary read_liberty invocations use this derived library without -lib or ignore-missing flags. Discovery, imported model names and actual linked cell types must match exactly; existing blackbox/functional checks, exact top port set, all 18 outputs, positive shared clock, reset contract and SAT requirements remain enforced. A later coverage file records successful model closure plus selection/source/derived hashes before proof. The pre-import selection manifest stays NOT_IMPORTED by itself.
+
+Offline suite: 119 tests, 118 passed, one existing Linux signal integration skipped on Windows. Tests first failed before implementation, then passed for byte preservation, global text, comments/quotes, actual define syntax, missing/duplicate cells, malformed structure/selection, idempotence and model/link closure; dropped models, unexpected models and blackboxes are rejected. The full actual source extraction also passed locally. No native Yosys discovery, selected-library import or SAT proof was run here. Native JSON frontend behavior/model normalization and induction convergence remain explicitly unverified; timeout/unsupported/error remains HOLD, not PASS.
+
+LIBRARY_SELECTION_STATIC_GATE = PASS_OFFLINE
+FORMAL_MODEL_IMPORT_GATE = NOT_RUN
+FORMAL_EQUIVALENCE_GATE = NOT_RUN
+READY_FOR_ONE_BOUNDED_NATIVE_JOB = YES_PENDING_NEW_AUTHORIZATION
+
+The next proposed action is normal publication of the local path fix and this library fix, followed by exactly one unchanged standard public Ubuntu job (10 minutes total; Formal 5 minutes; no physical flow/ECO, auto-retry, input/library-source/image change or new paid resource). Its purpose is native import plus full sequential proof under the existing contract, not a promise of baseline success. Current timing and full constraint gates remain FAIL/UNKNOWN. No push or dispatch occurred in this checkpoint.
+
 ## Local path correction and functional-model inventory after Run 39531565936
 
 The real native run validated the prior report-capture and SAT-help fixes. Exact WNS=-0.161583200 ns, TNS=-7.086462975 ns and 51 negative endpoints are retained. The post-run delay decoder defect is now corrected: a launch-clock input does not start the data section, the actual input-port/launch-Q boundary does, and the final output-port wire increment is included. A missing launch boundary is HOLD. Original producer JSON/ZIP remain immutable; all 51 paths were re-decoded in evidence/final-acceptance-b57565ec3f07/offline-corrected/ using the original reports. Worst-path data-cell delay is 0.357314038 ns including clock-to-Q, and data-net delay is 0.002443143 ns. The new public fixtures are the native worst-path block and deduplicated pin-direction inventory from Artifact 12315334148; fixture normalization changes no direction or delay value.
