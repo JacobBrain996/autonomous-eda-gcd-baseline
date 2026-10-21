@@ -183,7 +183,7 @@ def verify_verification_package(directory):
  return {'input_gate':'PASS','subject_id':subject['subject_id'],'task_id':manifest['task_id'],
   'execution_authorized':False,'ready_for_cloud_execution':False,'trust':'internal consistency; caller must authenticate source archive separately'}
 
-def review_candidate(state,artifact,expected_sha256,budget_seconds=0,formal_result=None,formal_sha256=None,after_state=None):
+def review_candidate(state,artifact,expected_sha256,budget_seconds=0,formal_result=None,formal_sha256=None,after_state=None,verification_package=None,formal_contract=None):
  """Candidate lifecycle. A candidate hold never writes the project Goal state.
 
  `after_state` must be independently loaded evidence, not an Agent verdict.
@@ -199,6 +199,14 @@ def review_candidate(state,artifact,expected_sha256,budget_seconds=0,formal_resu
   'candidate_status':statuses[plan['decision']],'verification':plan,'adoption':None,
   'operation_status':'WAITING_FOR_AUTHORIZATION' if plan['next_check'] else 'NOT_SCHEDULED',
   'block_scope':'CANDIDATE_ONLY','execution_authorized':False,'design_acceptance':'NOT_EVALUATED'}
+ if verification_package is not None or formal_contract is not None:
+  if verification_package is None or formal_contract is None or formal_result is None or formal_sha256 is None:raise ValueError('scope review requires package, contract and bound Formal archive')
+  from .formal_review import inspect_formal
+  review=inspect_formal(verification_package,formal_contract,formal_result,formal_sha256)
+  result['formal_scope_review']=review
+  if review.get('subject_id')!=subject['subject_id'] or review['scope_structure_gate']!='PASS_STATIC_CHECKS':
+   result.update(candidate_status='EVIDENCE_HOLD',operation_status='NOT_SCHEDULED',scope_join_issue='scope evidence invalid or foreign to the current candidate')
+   result['lifecycle_id']=digest(result);return result
  if after_state is not None:
   from .adoption import evaluate
   data=read_bundle(artifact);verify_bundle(data)

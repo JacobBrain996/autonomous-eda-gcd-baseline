@@ -160,3 +160,27 @@ limits, not forecasts; monetary cost is NOT_AVAILABLE. The next meaningful
 runtime validation needs separate authorization to publish this source and
 execute this exact one-job workflow, followed by evidence recovery and review.
 No additional controller or parameter sweep is introduced.
+
+## Offline Formal scope review
+
+`inspect-formal --package REQUEST --contract contracts/gcd.reset2.json --result
+VERIFIER_RESULT.zip --expected-sha256 TRUSTED_SHA` audits the sealed native
+result before independent execution/proof review. It checks registered contract,
+actual saved gold/gate/library SHA, complete ports and functional-model closure,
+exact generated miter/preparation/induction recipes, fresh auxiliary derivation,
+normalized/proof model snapshots and the four-stage PID/exit/runtime/log chain.
+Changing a producer claim and recomputing archive checksums cannot bypass these
+content checks. The reviewer implementation hashes are included in its result.
+
+`review-candidate` can additionally take --verification-package REQUEST and
+--formal-contract PROFILE alongside --formal-result/--formal-sha256. The joined
+scope review must refer to the exact same subject, otherwise candidate EVIDENCE_HOLD.
+It never upgrades the candidate on the strength of a scope check alone.
+
+PASS_STATIC_CHECKS means saved evidence is structurally consistent. Formal stays
+UNKNOWN and execution binding stays UNKNOWN_EXTERNAL_REVIEW_REQUIRED. This
+reviewer neither rederives RTLIL, authenticates GitHub execution, validates the
+solver's soundness nor replays a witness. Exit 0 means static review completed,
+not hardware PASS. Incomplete/error archives retain their raw tool observation;
+failed scope checks exit 2 and cannot unlock dependent execution. No new EDA run
+or public push is authorized by this software increment.

@@ -92,6 +92,35 @@ def proof_script(work,property_name):
  return (f'read_rtlil {work}/proof-input.il\n'+extra+f'hierarchy -check -top acceptance_miter\nproc; flatten; opt; dffunmap; opt_clean; check -assert\nwrite_json {work}/proof-model.json\n'
   +f'sat -seq 5 -tempinduct -maxsteps 32 -enable_undef -set-def-inputs -set-init-def -prove {property_name} 0 -verify -timeout 30 -show mismatch -show-inputs -show-regs -dump_json {work}/counterexample.json\n')
 
+def prepare_script(work,c):
+ work=_posix_path(work);validate_contract(c)
+ return f"""read_liberty {work}/functional.lib
+write_json {work}/models.json
+design -reset
+read_verilog {work}/gold.v
+hierarchy -check -top {c['top']}
+write_json {work}/gold-interface.json
+proc; flatten; memory_map; opt; dffunmap; opt_clean
+rename {c['top']} gold_core
+write_rtlil {work}/gold.il
+design -reset
+read_liberty {work}/functional.lib
+read_verilog {work}/candidate.v
+hierarchy -check -top {c['top']}
+write_json {work}/gate-linked.json
+proc; flatten; opt; dffunmap; opt_clean
+rename {c['top']} gate_core
+write_rtlil {work}/gate.il
+design -reset
+read_rtlil {work}/gold.il
+read_rtlil {work}/gate.il
+read_verilog -formal -sv {work}/miter.v
+hierarchy -check -top acceptance_miter
+proc; flatten; memory_map; opt; dffunmap; opt_clean; check -assert
+write_json {work}/miter.json
+write_rtlil {work}/miter.il
+"""
+
 def _admission(package,contract,frozen,work,image_record):
  verify_verification_package(package)
  subject=read_json(package/'subject.json');plan=read_json(package/'plan.json');bind_contract(contract,subject)
@@ -147,32 +176,7 @@ def execute_formal(package,contract_path,frozen_root,work,execute=False,image_re
   derived,selection=subset_liberty((out/'source.lib').read_bytes(),discovered);(out/'functional.lib').write_bytes(derived)
   selection.update(netlist_sha256=sha(out/'candidate.v'),engine_sha256=sha(yosys));write(out/'library-selection.json',selection)
   (out/'miter.v').write_bytes(make_miter(c).encode())
-  prep=f"""read_liberty {out}/functional.lib
-write_json {out}/models.json
-design -reset
-read_verilog {out}/gold.v
-hierarchy -check -top {c['top']}
-write_json {out}/gold-interface.json
-proc; flatten; memory_map; opt; dffunmap; opt_clean
-rename {c['top']} gold_core
-write_rtlil {out}/gold.il
-design -reset
-read_liberty {out}/functional.lib
-read_verilog {out}/candidate.v
-hierarchy -check -top {c['top']}
-write_json {out}/gate-linked.json
-proc; flatten; opt; dffunmap; opt_clean
-rename {c['top']} gate_core
-write_rtlil {out}/gate.il
-design -reset
-read_rtlil {out}/gold.il
-read_rtlil {out}/gate.il
-read_verilog -formal -sv {out}/miter.v
-hierarchy -check -top acceptance_miter
-proc; flatten; memory_map; opt; dffunmap; opt_clean; check -assert
-write_json {out}/miter.json
-write_rtlil {out}/miter.il
-"""
+  prep=prepare_script(out,c)
   run_script('prepare',prep)
   gold=read_json(out/'gold-interface.json',16*1024*1024)['modules'][c['top']]
   linked=read_json(out/'gate-linked.json',16*1024*1024)['modules'][c['top']]

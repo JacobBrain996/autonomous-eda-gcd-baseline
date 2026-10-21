@@ -11,6 +11,7 @@ from .execution import prepare_action,execute_action
 from .action_results import seal_action,inspect_action,advance_action
 from .verification import load_subject,plan_verification,prepare_verification,verify_verification_package,review_candidate
 from .formal_runtime import execute_formal
+from .formal_review import inspect_formal
 
 def read(path,limit):
     p=Path(path)
@@ -38,6 +39,8 @@ def main():
     p=sub.add_parser('execute-formal',help='bound candidate Formal; default NOT_RUN, Linux and separate execution authorization required')
     for part in ('package','contract','frozen-root','work'):p.add_argument('--'+part,required=True)
     p.add_argument('--execute',action='store_true');p.add_argument('--image-identity')
+    p=sub.add_parser('inspect-formal',help='offline model/property/process structure checks, never certified Formal PASS')
+    for part in ('package','contract','result','expected-sha256'):p.add_argument('--'+part,required=True)
     for command in ('verify-next','prepare-verification','review-candidate'):
         p=sub.add_parser(command,help='evidence-bound independent verification handoff; no EDA execution')
         for part in ('profile','smoke','acceptance','result','expected-sha256'):p.add_argument('--'+part,required=True)
@@ -47,6 +50,7 @@ def main():
             p.add_argument('--formal-result');p.add_argument('--formal-sha256')
             if command=='review-candidate':
                 for part in ('profile','smoke','acceptance'):p.add_argument('--after-'+part)
+                p.add_argument('--verification-package');p.add_argument('--formal-contract')
     p=sub.add_parser('evaluate',help='independently compare before/after evidence; never trusts policy success')
     for side in ('before','after'):
         for part in ('profile','smoke','acceptance'):p.add_argument('--'+side+'-'+part,required=True)
@@ -65,7 +69,10 @@ def main():
     p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
     args=parser.parse_args()
     try:
-        if args.command=='execute-formal':
+        if args.command=='inspect-formal':
+            state=inspect_formal(args.package,args.contract,args.result,args.expected_sha256)
+            rc=0 if state['scope_structure_gate']=='PASS_STATIC_CHECKS' else 2
+        elif args.command=='execute-formal':
             state=execute_formal(args.package,args.contract,args.frozen_root,args.work,args.execute,
                                  read_json(args.image_identity,65536) if args.execute and args.image_identity else None)
             rc=0 if state['status'] in ('NOT_RUN','UNBOUNDED_PROOF_REPORTED') else 2
@@ -77,7 +84,7 @@ def main():
                 after_args=(args.after_profile,args.after_smoke,args.after_acceptance)
                 if any(after_args) and not all(after_args):raise ValueError('complete after profile/Smoke/acceptance inputs required')
                 after=load_case(read_json(args.after_profile),args.after_smoke,args.after_acceptance) if all(after_args) else None
-                state=review_candidate(case,args.result,args.expected_sha256,args.budget_seconds,args.formal_result,args.formal_sha256,after)
+                state=review_candidate(case,args.result,args.expected_sha256,args.budget_seconds,args.formal_result,args.formal_sha256,after,args.verification_package,args.formal_contract)
             elif args.command=='prepare-verification':
                 state=prepare_verification(case,args.result,args.expected_sha256,args.output,args.budget_seconds)
             else:
