@@ -9,7 +9,7 @@
     "acceptance/snapshot.tcl": "b699b0a9879e30eb4bbeddc5e2dc0478976177128bb36a681f77314ae3bf99ca",
     "acceptance/miter.v": "6f0f4600f2a8004427e8381d39c246306de54754b5993bbcdd55180c5097d824",
     "verieda/__init__.py": "a5131213bc9b02b10a9d50568d581abfee1f56a13abcd928563dfd9e34093b28",
-    "verieda/__main__.py": "206f4d439fddac27a3afe462ea9639f22133ab4ffa53c65ccb45cca061d335e8",
+    "verieda/__main__.py": "22978ec39b95417a637805a43af47eaa2f556737d98a0a4ea43b0a502d2b6ded",
     "verieda/constraints.py": "d76eab2cb9a3a0cb4108ef28d02d3253b7247da9eabed03453028e57cab0218f",
     "verieda/evidence.py": "24b7c0e7e4b12b7ec3479655c0d4868306e86fe1dcc49485448383527e11d777",
     "verieda/formal.py": "e8710f48c6f589c4299e4b3477fffa6225b0888665e2a1a2d22ba93f4f9b8fa4",
@@ -59,8 +59,8 @@
     "tests/test_formal_review.py": "bac6938c48b06953920e75df63ccef47c8875f825a33be33cb8d5aa837ff3a61",
     "verieda/triage.py": "fc347f2c5556055901a636509d9e4bc6a37ee3e3b56f26b2abc101665320a206",
     "tests/test_triage.py": "37fc0f69519d69ed8c0c2927d026bb21104af13dd36d2c1ddf1e2a9e89e4fc95",
-    "verieda/decision.py": "63e92d522b169f356060e78d6ac75b78a6113f2ce43dce9a075014a7cf6c6732",
-    "tests/test_decision.py": "25a97ce0004d3bceb50adb42be8b48b209dca413f1f37af1af75c192457889c2"
+    "verieda/decision.py": "e27f73070ec90687edbae7355359000d343b9aed4e5279b71e9663801f2b17a2",
+    "tests/test_decision.py": "09b3d711f018aef6f669d013ed2748cede4086aeca2da33725bffa747674ba64"
   },
   "scope": "existing final netlist only; no physical optimization; no baseline promotion",
   "authorization_boundary": "Integrity manifest only; this file does not authorize push or dispatch."

@@ -40,6 +40,7 @@ def main():
     p.add_argument('--budget-seconds',type=int,default=0,help='remaining native budget, excludes setup/billing')
     for part in ('result','expected-sha256','formal-result','formal-sha256','verification-package','formal-contract'):p.add_argument('--'+part)
     for part in ('profile','smoke','acceptance'):p.add_argument('--after-'+part)
+    p.add_argument('--action-history',help='JSON list of pinned saved action archives; budget-seconds becomes total listed action plus future native budget')
     p=sub.add_parser('plan',help='load pinned evidence and propose legal bounded actions; no execution')
     p.add_argument('--profile',required=True);p.add_argument('--smoke',required=True);p.add_argument('--acceptance',required=True)
     p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
@@ -83,7 +84,7 @@ def main():
             after_args=(args.after_profile,args.after_smoke,args.after_acceptance)
             if any(after_args) and not all(after_args):raise ValueError('complete after profile/Smoke/acceptance inputs required')
             after=load_case(read_json(args.after_profile),args.after_smoke,args.after_acceptance) if all(after_args) else None
-            state=decide(case,args.budget_seconds,args.result,args.expected_sha256,args.formal_result,args.formal_sha256,args.verification_package,args.formal_contract,after)
+            state=decide(case,args.budget_seconds,args.result,args.expected_sha256,args.formal_result,args.formal_sha256,args.verification_package,args.formal_contract,after,read_json(args.action_history) if args.action_history else None)
             rc=2 if state['next_action']=='HOLD_EVIDENCE' else 0
         elif args.command=='diagnose':
             state=diagnose(args.artifact,args.expected_sha256)

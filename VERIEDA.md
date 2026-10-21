@@ -209,3 +209,46 @@ archive with the wrong task ID reproduced a lifecycle override defect: final
 state evaluation could overwrite HOLD_VERIFIER_EVIDENCE. The shared lifecycle
 now returns that HOLD before considering final adoption. Original ZIPs remain
 unchanged. No repaired native Formal run, push or dispatch occurred.
+
+
+## Recover candidate and native budget from saved action history
+
+`decide --action-history HISTORY.json --budget-seconds N` accepts at most 16
+references, with 32 MiB total unique action ZIP bytes. HISTORY.json is a list:
+
+```json
+[{"artifact":"evidence/verieda-action-ed5d84b9bdf7/result.zip","sha256":"15ad5d562b81007dc4364dd4a5320890f7160adcfaf893e8aa14308f968f7bf3"}]
+```
+
+Paths use the current working directory. Only these two keys are accepted;
+caller-supplied outcome, runtime or acceptance claims are rejected. Every unique
+archive is SHA-checked and parsed through the existing action receipt inspector,
+then bound to this reference state. Repeated SHA references count once. Different
+archives for the same candidate HOLD for review rather than being treated as
+an authorized retry. Multiple unresolved completed candidates also HOLD. An
+explicit --result must be included and agree with any pending history candidate.
+
+The single completed candidate is recovered automatically, so forgetting --result
+does not launch another mapping proposal. Optional current --formal-result and
+--formal-sha256 join its independently bound saved verification observation.
+Failed actions remain in the policy's exclusion history; they are not retried.
+
+With this flag only, N is a TOTAL supplied native budget (0..600 seconds), rather
+than the default unspent budget: checked action time is subtracted before future
+verification admission. Remaining admission time is rounded down. Saved current
+Formal runtime is also reported/subtracted once its task identity is verified;
+no new work is scheduled when reviewing it. Costs beyond N remain visible and
+do not prevent free offline diagnosis. This is not a complete research-account
+ledger: unsupplied executions, cloud queue/setup/job overhead and billing remain
+unaccounted. No expected benefit, monetary price, permission or reservation is
+inferred. Caller-trusted archive identities are not independent cloud attestation.
+
+For the retained action, a 304-second total leaves a 300-second Formal cap after
+3.140316279 seconds of synthesis execution. A 303-second total stops for budget.
+Joining the actual saved Formal preparation failure additionally records about
+0.822325418 seconds and recommends tool-failure review, not another EDA run.
+
+History checkpoint: 236 offline tests, 235 passed and one Linux-only test skipped.
+New coverage includes actual artifact cost/identity, duplicate and conflicting
+references, budget admission boundary, directory rejection and CLI/API parity.
+No new EDA run or proof result was generated.

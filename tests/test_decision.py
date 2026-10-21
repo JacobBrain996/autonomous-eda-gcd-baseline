@@ -86,6 +86,53 @@ class DecisionTests(unittest.TestCase):
    self.assertEqual(r['failure']['analysis_gate'],'PASS')
    self.assertEqual(r['next_action'],'HOLD_EVIDENCE');self.assertEqual(r['design_acceptance'],'NOT_EVALUATED')
   with self.assertRaises(ValueError):decide(self.state,after_state=a)
+ def test_history_recovers_pending_candidate_and_counts_real_runtime_once(self):
+  rows=[{'artifact':str(RESULT),'sha256':RESULT_SHA}]*2
+  r=decide(self.state,304,action_history=rows)
+  self.assertIsNone(r['proposal']);self.assertEqual(r['next_action'],'PREPARE_VERIFICATION_REQUEST')
+  self.assertEqual(r['history']['unique_action_archives'],1)
+  self.assertAlmostEqual(r['history']['recorded_action_native_seconds'],3.140316279)
+  self.assertEqual(r['candidate']['verification']['budget']['unspent_native_seconds'],300)
+  self.assertEqual(decide(self.state,303,action_history=rows)['next_action'],'STOP_BUDGET')
+ def test_history_bad_foreign_or_conflicting_sources_never_fall_back_to_proposal(self):
+  for rows in ([{'artifact':str(RESULT),'sha256':'0'*64}],
+               [{'artifact':str(RESULT),'sha256':RESULT_SHA,'outcome':'ACCEPTED'}]):
+   r=decide(self.state,600,action_history=rows)
+   self.assertEqual(r['next_action'],'HOLD_EVIDENCE');self.assertIsNone(r['proposal'])
+  s=copy.deepcopy(self.state);s['design']='other';s['state_id']=digest({k:v for k,v in s.items() if k!='state_id'})
+  self.assertEqual(decide(s,600,action_history=[{'artifact':str(RESULT),'sha256':RESULT_SHA}])['next_action'],'HOLD_EVIDENCE')
+ def test_history_can_join_current_formal_failure_without_another_mapping(self):
+  r=decide(self.state,600,formal_result=FORMAL,formal_sha256=FORMAL_SHA,
+           action_history=[{'artifact':str(RESULT),'sha256':RESULT_SHA}])
+  self.assertEqual(r['next_action'],'REVIEW_TOOL_FAILURE');self.assertIsNone(r['proposal'])
+  self.assertEqual(r['candidate']['candidate_status'],'CANDIDATE_TOOL_BLOCKED')
+  self.assertAlmostEqual(r['history']['recorded_formal_native_seconds'],0.822325418)
+  self.assertEqual(r['budget']['unspent_native_seconds'],596)
+ def test_history_cli_matches_api_and_conflicting_attempts_hold(self):
+  from test_action_results import ActionResultTests
+  from verieda.action_results import seal_action
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp);rows=[{'artifact':str(RESULT),'sha256':RESULT_SHA}]
+   history=root/'history.json';history.write_text(json.dumps(rows))
+   args=[sys.executable,'-m','verieda','decide','--profile','cases/gcd.json','--smoke',str(SMOKE),'--acceptance',str(NATIVE),'--budget-seconds','304','--action-history',str(history)]
+   p=subprocess.run(args,cwd=ROOT,capture_output=True,timeout=30)
+   self.assertEqual(p.returncode,0,p.stderr.decode())
+   self.assertEqual(json.loads(p.stdout),decide(self.state,304,action_history=rows))
+   # A valid, different saved execution for the same candidate is ambiguous,
+   # even if both receipt histories are independently parseable.
+   ActionResultTests.setUpClass();bundle,work,_=ActionResultTests().fixture(root)
+   archive=root/'synthetic.zip';seal_action(bundle,work,archive)
+   rows.append({'artifact':str(archive),'sha256':hashlib.sha256(archive.read_bytes()).hexdigest()})
+   r=decide(self.state,600,action_history=rows)
+   self.assertEqual(r['next_action'],'HOLD_EVIDENCE');self.assertIsNone(r['proposal'])
+   self.assertIn('conflicting archives',r['issues'][0])
+   directory=root/'unpacked';directory.mkdir()
+   with zipfile.ZipFile(archive) as z:z.extractall(directory)
+   fake_anchor='a'*64
+   from verieda.action_results import inspect_action
+   self.assertEqual(inspect_action(directory,fake_anchor)['evidence_gate'],'FAIL')
+   r=decide(self.state,600,action_history=[{'artifact':str(directory),'sha256':fake_anchor}])
+   self.assertEqual(r['next_action'],'HOLD_EVIDENCE')
  def test_cli_loads_real_evidence_and_matches_api(self):
   args=[sys.executable,'-m','verieda','decide','--profile','cases/gcd.json','--smoke',str(SMOKE),'--acceptance',str(NATIVE),'--budget-seconds','300','--result',str(RESULT),'--expected-sha256',RESULT_SHA,'--formal-result',str(FORMAL),'--formal-sha256',FORMAL_SHA]
   p=subprocess.run(args,cwd=ROOT,capture_output=True,timeout=30)
