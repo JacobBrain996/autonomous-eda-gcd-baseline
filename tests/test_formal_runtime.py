@@ -35,6 +35,24 @@ class FormalRuntimeTests(unittest.TestCase):
   for token in ('-tempinduct','-enable_undef','-set-init-def','-verify','-prove mismatch 0'):self.assertIn(token,p)
   for token in ('-set-init-zero','-set-assumes','-seq 0'):self.assertNotIn(token,p)
   with self.assertRaises(ValueError):f.proof_script('/work/check','mismatch;exec')
+ def test_gold_interface_export_requires_process_lowering_before_flatten(self):
+  # Regression for native run 39593539830: JSON rejects behavioral processes.
+  # Model only that backend prerequisite; this is not a Yosys integration test.
+  script=f.prepare_script('/work/check',self.contract())
+  gold=False;processes=False;flattened=False;snapshots=0
+  for line in script.splitlines():
+   for command in line.split(';'):
+    tokens=command.strip().split()
+    if not tokens:continue
+    if tokens==['design','-reset']:gold=False;processes=False;flattened=False
+    if tokens==['read_verilog','/work/check/gold.v']:gold=True;processes=True
+    if tokens[0]=='proc':processes=False
+    if tokens[0]=='flatten':flattened=True
+    if gold and tokens[0]=='write_json':
+     self.assertFalse(processes,'native JSON backend requires proc before exporting gold RTL')
+     self.assertFalse(flattened,'interface evidence must precede flattening')
+     self.assertEqual(tokens[1],'/work/check/gold-interface.json');snapshots+=1
+  self.assertEqual(snapshots,1)
  def test_default_execution_is_not_run_and_does_not_create_work(self):
   with tempfile.TemporaryDirectory() as tmp:
    w=pathlib.Path(tmp)/'work'

@@ -205,3 +205,28 @@ log coordinate and unknown executable/ISA cause.
 These changes are local and excluded from the explicitly approved 9a84b59
 publication/cloud run. Runtime evidence for that run must remain attributed to
 9a84b59, not to a later local software revision.
+
+
+## Native preparation ordering repair (local, after run 39593539830)
+
+The authorized 9a84b59 run failed before proof: Yosys JSON export rejected
+unlowered gold RTL processes. The adapter now runs proc before exporting the
+hierarchical gold interface, then performs the existing flatten/normalization.
+No RTL, SDC, reset contract, library, tool, proof property or candidate was changed.
+The regression models the JSON prerequisite and pre-flatten interface boundary;
+it failed against the old recipe and passes against the repair. It is not a
+native Yosys test. Archived run evidence and its failed verdict remain unchanged.
+
+The repaired recipe has not run on Linux/Yosys. Formal remains UNKNOWN and the
+candidate remains CANDIDATE_TOOL_BLOCKED, pending separate authorization. A new
+controlled run, if approved, must use the repaired commit rather than rerunning
+9a84b59: one standard public runner job <=10 min, Formal <=5 min, no synthesis,
+physical implementation or automatic retry. Stop on identity/resource/permission
+failure; retain evidence even if preparation or proof fails. The expected benefit
+is testing native preparation and candidate equivalence, not claiming timing gain.
+
+Offline validation: 223 tests, 222 passed and one existing Linux-only integration
+skipped on Windows. Source package hashes, Python syntax, diff whitespace and
+original Run 1 / native Formal ZIP hashes passed. The initial sandboxed suite
+failed on temporary-directory permissions; the permitted local rerun passed.
+No native repaired execution, public push or new dispatch occurred.

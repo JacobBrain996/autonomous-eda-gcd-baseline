@@ -99,8 +99,9 @@ write_json {work}/models.json
 design -reset
 read_verilog {work}/gold.v
 hierarchy -check -top {c['top']}
+proc
 write_json {work}/gold-interface.json
-proc; flatten; memory_map; opt; dffunmap; opt_clean
+flatten; memory_map; opt; dffunmap; opt_clean
 rename {c['top']} gold_core
 write_rtlil {work}/gold.il
 design -reset
