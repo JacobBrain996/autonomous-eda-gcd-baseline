@@ -9,7 +9,7 @@ from pathlib import Path
 from .case import digest
 from .policy import propose
 from .action_results import inspect_action
-from .verification import review_candidate
+from .verification import review_candidate,load_subject,plan_verification
 from .triage import diagnose
 from .timing import explain_timing
 
@@ -107,6 +107,13 @@ def decide(state,budget_seconds=0,result=None,expected_sha256=None,
    if report['failure'] and (report['failure']['evidence_gate']!='PASS' or report['failure']['analysis_gate']!='PASS'):
     report['issues'].append('Formal diagnostic evidence invalid or contradictory; no adoption evaluation')
    else:
+    if history is not None and formal_result is not None:
+     # Total-history mode: validate/join the current proof before deciding
+     # whether the next stage fits. Subtract from the unrounded total once.
+     prior=plan_verification(load_subject(state,result,expected_sha256),available,formal_result,formal_sha256)
+     current=prior['observation']
+     if current is not None:
+      available=math.floor(max(0,budget_seconds-history['recorded_action_native_seconds']-current['runtime_seconds']))
     lifecycle=review_candidate(state,result,expected_sha256,available,formal_result,formal_sha256,after_state=after_state,
                                verification_package=verification_package,formal_contract=formal_contract)
     report['candidate']=lifecycle;report['next_action']=NEXT[lifecycle['candidate_status']]

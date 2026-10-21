@@ -94,6 +94,26 @@ class DecisionTests(unittest.TestCase):
   self.assertAlmostEqual(r['history']['recorded_action_native_seconds'],3.140316279)
   self.assertEqual(r['candidate']['verification']['budget']['unspent_native_seconds'],300)
   self.assertEqual(decide(self.state,303,action_history=rows)['next_action'],'STOP_BUDGET')
+ def test_reviewed_proof_cost_is_deducted_before_physical_budget_decision(self):
+  proof=ROOT/'evidence/candidate-formal-b19cc94faa0d/verifier-result.zip'
+  h='06619a67e1060a3a0c396b9dcba5867cb5134f46e75074229df6d936471d660b'
+  package=ROOT/'evidence/verification-handoff-20261021-v1/package'
+  history=[{'artifact':str(RESULT),'sha256':RESULT_SHA}]
+  # Actual synthesis 3.140316279s + current Formal 1.988046108s.
+  for budget,left,next_action in ((565,559,'STOP_BUDGET'),(566,560,'PREPARE_PHYSICAL_EXPERIMENT')):
+   with self.subTest(budget=budget):
+    r=decide(self.state,budget,formal_result=proof,formal_sha256=h,verification_package=package,
+             formal_contract=ROOT/'contracts/gcd.reset2.json',action_history=history)
+    self.assertEqual(r['budget']['unspent_native_seconds'],left)
+    self.assertEqual(r['candidate']['verification']['budget']['unspent_native_seconds'],left)
+    self.assertEqual(r['next_action'],next_action)
+    self.assertEqual(r['candidate']['verification']['gates']['formal'],'PASS_RESET_CONTRACT_UNBOUNDED')
+    self.assertFalse(r['execution_authorized']);self.assertIsNone(r['proposal'])
+  # Without total-history mode, the supplied budget is already unspent;
+  # subtracting a saved proof again would charge it twice.
+  r=decide(self.state,560,RESULT,RESULT_SHA,proof,h,package,ROOT/'contracts/gcd.reset2.json')
+  self.assertEqual(r['next_action'],'PREPARE_PHYSICAL_EXPERIMENT')
+  self.assertEqual(r['budget']['unspent_native_seconds'],560)
  def test_history_bad_foreign_or_conflicting_sources_never_fall_back_to_proposal(self):
   for rows in ([{'artifact':str(RESULT),'sha256':'0'*64}],
                [{'artifact':str(RESULT),'sha256':RESULT_SHA,'outcome':'ACCEPTED'}]):

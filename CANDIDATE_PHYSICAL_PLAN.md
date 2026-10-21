@@ -69,6 +69,11 @@ acceptable optimization, improvement with violations, regression, functional or
 physical failure, verification insufficiency and budget stop. Native runtime
 budget excludes setup/billing, and a budget stop preserves the observed QoR
 classification. It never authorizes execution or changes the frozen constraints.
+In total-history mode the current, identity-checked Formal runtime is deducted
+before deciding whether physical work fits; raw fractional runtimes are summed
+before rounding. In remaining-budget mode it is not charged again. The actual
+565/566-second boundary is covered by saved-evidence regression tests.
+
 Full adoption still requires independent final proof, constraint/coverage review,
 all physical gates, nonnegative setup/hold, real WNS improvement and <=10% area
 increase. A single before/after pair does not establish statistical causality.
@@ -99,7 +104,7 @@ or hash mismatch, unsupported model/format, resource failure, timeout or nonzero
 exit stops; preserve raw errors, no fallback or automatic retry. No new physical
 result or candidate optimization success is claimed here.
 
-Offline: 261 tests, 260 pass, 1 Linux integration skip; YAML/actionlint, all workflow
+Offline: 262 tests, 261 pass, 1 Linux integration skip; YAML/actionlint, all workflow
 Bash blocks and embedded Python, Python AST, Tcl grouping, source package hashes
 and git diff checks pass. Real frozen Linux/OpenROAD/hold/physical-to-final-Formal
 integration remains NOT_RUN. Source pins grew to 66 files (bounded maximum 80);
