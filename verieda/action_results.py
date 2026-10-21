@@ -155,6 +155,7 @@ def advance_action(state,artifact,expected_sha256,budget_seconds=0,history=None)
     result={'schema':'verieda.feedback.v0','state_id':state['state_id'],'observation':observation,
             'history':rows,'budget':control['budget'],'execution_authorized':False,
             'design_acceptance':'NOT_EVALUATED','decision':'HOLD_RESULT_EVIDENCE'}
+    result['cost_scope']='saved native action duration only; cloud setup/queue/job duration and monetary cost NOT_AVAILABLE'
     record=observation['history_record']
     if observation.get('state_id') not in (None,state['state_id']):result['decision']='HOLD_FOREIGN_STATE'
     elif record:

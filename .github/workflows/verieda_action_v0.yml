@@ -1,0 +1,139 @@
+name: VeriEDA V0 isolated synthesis integration - no baseline promotion
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_id:
+        description: Explicitly approved immutable mapping candidate ID
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: verieda-action-v0
+  cancel-in-progress: false
+jobs:
+  synthesis:
+    if: github.repository == 'JacobBrain996/autonomous-eda-gcd-baseline' && github.event.repository.visibility == 'public'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ORFS_COMMIT: 3a964e13f11a4e435aac01ffa14db0a7d2853720
+      ORFS_IMAGE: openroad/orfs@sha256:7fbb16f7aaf3caa170ea308c1bd833defc7fdf1f5316303dce6a0e6eeb6deee9
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+      APPROVED_CANDIDATE_ID: ${{ inputs.candidate_id }}
+      WORKFLOW_SOURCE_SHA: ${{ github.workflow_sha }}
+      WORKFLOW_SOURCE_REF: ${{ github.workflow_ref }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Admission and exact source package check
+        env:
+          HOSTED_ENVIRONMENT: ${{ runner.environment }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/action-job/native evidence/action-job/artifact
+          test "$HOSTED_ENVIRONMENT" = github-hosted
+          test "$RUNNER_OS/$RUNNER_ARCH" = Linux/X64
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          python3 acceptance/verify.py package-check
+          python3 - <<'PY'
+          import json,os,pathlib,re,subprocess
+          assert re.fullmatch('[0-9a-f]{64}',os.environ['APPROVED_CANDIDATE_ID'])
+          assert os.environ['GITHUB_SHA']==os.environ['WORKFLOW_SOURCE_SHA']
+          endpoint='repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/workflows/verieda_action_v0.yml/runs?head_sha='+os.environ['GITHUB_SHA']+'&event=workflow_dispatch&per_page=100'
+          runs=json.loads(subprocess.check_output(['gh','api','--hostname','github.com',endpoint],timeout=30))['workflow_runs']
+          assert not [r for r in runs if str(r['id'])!=os.environ['GITHUB_RUN_ID']], 'HOLD: another dispatch exists for this commit; no retry'
+          names=('GITHUB_REPOSITORY','GITHUB_RUN_ID','GITHUB_SHA','GITHUB_RUN_ATTEMPT','WORKFLOW_SOURCE_REF','WORKFLOW_SOURCE_SHA','RUNNER_OS','RUNNER_ARCH')
+          pathlib.Path('evidence/action-job/artifact/execution-source.json').write_text(json.dumps({k:os.environ[k] for k in names},indent=2)+'\n')
+          PY
+          bash scripts/preflight.sh before
+      - name: Restore exact public Smoke and reviewed acceptance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/verieda_cloud_inputs.py
+      - name: Plan and prepare approved candidate without executing tools
+        run: |
+          set -euo pipefail
+          python3 -m verieda plan --profile cases/gcd.json --smoke evidence/action-job/inputs/smoke.zip --acceptance evidence/action-job/inputs/acceptance.zip --budget-seconds 600 > evidence/action-job/plan.json
+          python3 - <<'PY'
+          import json,os,pathlib
+          decision=json.loads(pathlib.Path('evidence/action-job/plan.json').read_text())['decision']
+          candidate=decision['selected_candidate']
+          assert candidate and candidate['candidate_id']==os.environ['APPROVED_CANDIDATE_ID'], 'HOLD: approved candidate changed'
+          pathlib.Path('evidence/action-job/candidate.json').write_text(json.dumps(candidate,indent=2)+'\n')
+          PY
+          python3 -m verieda prepare-action --profile cases/gcd.json --smoke evidence/action-job/inputs/smoke.zip --acceptance evidence/action-job/inputs/acceptance.zip --candidate evidence/action-job/candidate.json --output evidence/action-job/package > evidence/action-job/artifact/preparation.json
+      - name: Frozen source and image with resource gates
+        run: |
+          set -euo pipefail
+          git init orfs
+          git -C orfs remote add origin https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git
+          git -C orfs fetch --depth=1 origin "$ORFS_COMMIT"
+          git -C orfs checkout --detach FETCH_HEAD
+          test "$(git -C orfs rev-parse HEAD)" = "$ORFS_COMMIT"
+          bash scripts/preflight.sh before-pull
+          docker pull "$ORFS_IMAGE" > evidence/action-job/artifact/pull.log 2>&1
+          python3 - <<'PY'
+          import json,os,pathlib,subprocess
+          from verieda.execution import check_image_record
+          m=json.loads(subprocess.check_output(['docker','image','inspect',os.environ['ORFS_IMAGE']],timeout=15))[0]
+          record={'image_id':m['Id'],'repo_digests':m['RepoDigests'],'os':m['Os'],'architecture':m['Architecture']}
+          check_image_record(record,json.loads(pathlib.Path('verieda/action_support.json').read_text()))
+          pathlib.Path('evidence/action-job/artifact/image-identity.json').write_text(json.dumps(record,indent=2)+'\n')
+          PY
+          bash scripts/preflight.sh after
+      - name: Execute synthesis action once in isolated frozen container
+        run: |
+          set -euo pipefail
+          name="verieda-action-$GITHUB_RUN_ID"
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          rc=0
+          timeout --kill-after=5 340 docker run --rm --name "$name" --network none --read-only --workdir /app \
+            --cpus 2 --memory 6g --pids-limit 128 --cap-drop ALL --security-opt no-new-privileges \
+            --ulimit core=0 --ulimit fsize=16777216 --user "$(id -u):$(id -g)" \
+            --tmpfs /tmp:rw,size=67108864 --env PYTHONDONTWRITEBYTECODE=1 --entrypoint /usr/bin/python3 \
+            -v "$GITHUB_WORKSPACE:/app:ro" -v "$GITHUB_WORKSPACE/orfs:/frozen:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/action-job/package:/package:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/action-job/artifact/image-identity.json:/image-identity.json:ro" \
+            -v "$GITHUB_WORKSPACE/evidence/action-job/native:/work" \
+            "$ORFS_IMAGE" -m verieda execute-action --package /package --frozen-root /frozen --work /work/action --image-identity /image-identity.json --execute > evidence/action-job/artifact/container.log 2>&1 || rc=$?
+          printf '%s\n' "$rc" > evidence/action-job/artifact/container-return-code.txt
+          exit "$rc"
+      - name: Preserve result or explicit initialization HOLD
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,pathlib
+          base=pathlib.Path('evidence/action-job');public=base/'artifact';public.mkdir(parents=True,exist_ok=True)
+          if not (base/'package/manifest.json').is_file():
+              (public/'hold.json').write_text(json.dumps({'status':'UNKNOWN_HOLD','reason':'package/admission/input failure; see raw job logs'})+'\n')
+              raise SystemExit(1)
+          work=base/'native/action';work.mkdir(parents=True,exist_ok=True)
+          try:record=json.loads((public/'container.log').read_text())
+          except (OSError,ValueError):record={'status':'UNKNOWN','reason':'no complete container JSON; see raw container/job logs'}
+          if not isinstance(record,dict):record={'status':'UNKNOWN','reason':'container JSON was not an object; see raw log'}
+          record.setdefault('candidate_id',os.environ['APPROVED_CANDIDATE_ID']);record.setdefault('phase','SYNTHESIS_ONLY')
+          (work/'launcher-result.json').write_text(json.dumps(record,indent=2)+'\n')
+          PY
+          python3 -m verieda seal-action --package evidence/action-job/package --work evidence/action-job/native/action --output evidence/action-job/artifact/result.zip > evidence/action-job/artifact/seal.json
+      - name: Upload only explicit public action evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: verieda-action-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            evidence/action-job/artifact/
+            evidence/environment/lscpu.txt
+            evidence/environment/uname-*.txt
+            evidence/environment/resources-*.txt
+            evidence/environment/free-*.txt
+            evidence/environment/df-*.txt
+            evidence/environment/docker-cli.txt
+            evidence/environment/docker-version.txt
+          if-no-files-found: error
+          retention-days: 7
