@@ -1,7 +1,7 @@
 import argparse,hashlib,json
 from pathlib import Path
 from .evidence import inspect
-from .constraints import compare_sdc
+from .constraints import compare_sdc,inspect_io_coverage
 from .formal import observe_yosys
 from .native import inspect_acceptance
 from .case import load_case,read_json
@@ -33,6 +33,8 @@ def main():
     p.add_argument('artifact');p.add_argument('--expected-sha256',required=True)
     p=sub.add_parser('inspect-acceptance',help='audit native acceptance bundle; no proof promotion')
     p.add_argument('artifact');p.add_argument('--expected-sha256')
+    p=sub.add_parser('inspect-io-coverage',help='check literal SDC I/O modes against native ports TSV; no full constraint PASS')
+    p.add_argument('--sdc',required=True);p.add_argument('--ports',required=True)
     p=sub.add_parser('compare-constraints',help='strict exported-SDC literal profile; never executes Tcl')
     p.add_argument('reference');p.add_argument('candidate')
     p=sub.add_parser('observe-formal',help='classify a log; does not certify proof or witness')
@@ -87,7 +89,10 @@ def main():
     p.add_argument('--budget-seconds',type=int,default=0);p.add_argument('--history')
     args=parser.parse_args()
     try:
-        if args.command=='prepare-hold-script':
+        if args.command=='inspect-io-coverage':
+            _,sdc=read(args.sdc,2*1024*1024);_,ports=read(args.ports,2*1024*1024)
+            state=inspect_io_coverage(sdc,ports);rc=2 if state['observation']=='HOLD_PROFILE_OR_INVENTORY' else 0
+        elif args.command=='prepare-hold-script':
             from .execution import _unlinked
             script=build_hold_script();target=_unlinked(args.output)
             with target.open('xb') as stream:stream.write(script)

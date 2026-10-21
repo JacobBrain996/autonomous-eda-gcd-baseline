@@ -8,6 +8,7 @@ from pathlib import Path
 from .evidence import read_bundle, verify_bundle, object_json
 from .formal import observe_yosys
 from .sta_min import observe_hold
+from .constraints import inspect_io_coverage,compare_sdc
 
 PREFIX='final-acceptance/'
 OUTPUT=PREFIX+'output/'
@@ -27,7 +28,7 @@ def _validation_coverage(data):
     return {'schema':'verieda.validation-coverage.v1','coverage_report':report,
             'checker_capabilities':{'setup_wns_tns':'IMPLEMENTED_OBSERVATION_ONLY',
                                     'independent_hold':'OFFLINE_OBSERVER_IMPLEMENTED_NATIVE_UNVALIDATED',
-                                    'constraint_coverage_certification':'NOT_IMPLEMENTED',
+                                    'constraint_coverage_certification':'NOT_IMPLEMENTED','io_literal_coverage':'IMPLEMENTED_STATIC_OBSERVER',
                                     'raw_formal_result':'OBSERVATION_ONLY_NOT_CERTIFIED'},
             'required_observations':['independent_min_delay_paths_and_wns_tns',
                                      'native_clock_and_endpoint_inventory',
@@ -38,6 +39,48 @@ def _validation_coverage(data):
             'next_local_action':'implement and test missing validators before claiming complete native acceptance',
             'scope':'capabilities of this native bundle importer, not all VeriEDA modules; no timing/frozen-input/Goal mutation',
             'execution_authorized':False}
+
+
+def _constraint_context_observation(data):
+    root=OUTPUT+'constraints/';filename=root+'contexts.json'
+    result={'schema':'verieda.constraint-context-observation.v1','observation':'NOT_AVAILABLE',
+            'roles':{},'comparison':None,'full_constraint_gate':'UNKNOWN',
+            'scope':'same final-ODB snapshots only; no original RTL-stage or physical clock-equivalence certificate',
+            'execution_identity':'UNAUTHENTICATED_REPORT'}
+    if filename not in data:return result
+    def obj(name):
+        value,duplicates=object_json(data,name)
+        if duplicates or not isinstance(value,dict):raise ValueError('malformed context object '+name)
+        return value
+    sha=lambda raw:hashlib.sha256(raw).hexdigest()
+    try:
+        context=obj(filename);identity=obj(OUTPUT+'identity.json')
+        if context.get('schema')!='verieda.native-constraint-context.v1' or set(context.get('roles',{}))!={'reference','candidate'}:raise ValueError('unsupported constraint context')
+        if not isinstance(identity.get('sources'),dict):raise ValueError('missing source identity map')
+        refs=[v for n,v in identity['sources'].items() if n.endswith('/constraint.sdc')]
+        if len(refs)!=1:raise ValueError('ambiguous original SDC identity')
+        expected={'reference':refs[0],'candidate':sha(data[PREFIX+'inputs/6_final.sdc'])}
+        odb=sha(data[PREFIX+'inputs/6_final.odb']);observed={};snapshots={}
+        for role in ('reference','candidate'):
+            meta=context['roles'][role];base=root+role+'/'
+            if meta['source_sdc_sha256']!=expected[role] or meta['odb_sha256']!=odb or type(meta['native_return_code']) is not int or meta['native_return_code']!=0:raise ValueError('snapshot input/exit binding mismatch')
+            names=('evaluated.sdc','units.rpt','coverage.rpt','ports.tsv')
+            if meta['outputs']!={n:sha(data[base+n]) for n in names}:raise ValueError('snapshot output hash mismatch')
+            status=obj(base+'tool.log.status.json')
+            if type(status.get('return_code')) is not int or status['return_code']!=0:raise ValueError('native snapshot process did not succeed')
+            sdc=data[base+'evaluated.sdc'].decode('utf-8-sig');ports=data[base+'ports.tsv'].decode('utf-8-sig')
+            coverage=inspect_io_coverage(sdc,ports)
+            if coverage['observation']=='HOLD_PROFILE_OR_INVENTORY':raise ValueError('snapshot I/O profile unsupported: '+coverage.get('reason','unknown'))
+            snapshots[role]=sdc
+            observed[role]={'io_coverage':coverage,'source_sdc_sha256':expected[role],'odb_sha256':odb,
+                            'outputs':meta['outputs'],'process_status_sha256':sha(data[base+'tool.log.status.json'])}
+        for name in ('ports.tsv','units.rpt'):
+            if data[root+'reference/'+name]!=data[root+'candidate/'+name]:raise ValueError('snapshot port/unit contexts differ')
+        result.update(observation='BOUND_SNAPSHOTS_OBSERVED',roles=observed,
+                      comparison=compare_sdc(snapshots['reference'],snapshots['candidate']),
+                      context_manifest_sha256=sha(data[filename]),identity_record_sha256=sha(data[OUTPUT+'identity.json']))
+    except (ValueError,KeyError,TypeError,AttributeError,RecursionError,UnicodeError) as ex:result.update(observation='HOLD_CONTEXT_BINDING',reason=str(ex))
+    return result
 
 
 def inspect_acceptance(path,expected_archive_sha=None):
@@ -59,6 +102,7 @@ def inspect_acceptance(path,expected_archive_sha=None):
         state['gates']['evidence']='PASS'
         state['evidence']={'files':len(data),'trust':'EXPECTED_ARCHIVE_SHA256' if expected_archive_sha else 'CHECKSUM_CONSISTENCY_ONLY'}
         state['validation_coverage']=_validation_coverage(data)
+        state['constraint_context_observation']=_constraint_context_observation(data)
     except (ValueError,KeyError,TypeError,OSError,UnicodeError,zipfile.BadZipFile) as ex:
         state['gates']['evidence']='FAIL';state['acceptance']='EVIDENCE_INVALID'
         issue('EVIDENCE_INVALID',str(ex));return state

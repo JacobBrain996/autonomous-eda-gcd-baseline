@@ -91,6 +91,20 @@ class NativeEvidenceTests(unittest.TestCase):
                 'final-acceptance/output/sta/hold.log.status.json':'{"return_code":0}'})
             r=self.inspect(p);self.assertEqual(r['hold_observation']['hold_gate'],'FAIL')
             self.assertFalse(r['validation_coverage']['can_certify_full_final_acceptance'])
+    def test_constraint_snapshots_are_recomputed_and_bound_not_trusted_from_claims(self):
+        from test_case import NATIVE
+        from verieda.evidence import read_bundle
+        from verieda.native import _constraint_context_observation
+        data=read_bundle(NATIVE);name='final-acceptance/output/constraints/contexts.json'
+        meta=json.loads(data[name]);meta['comparison']={'comparison':'EQUAL_WITHIN_PROFILE'}
+        data[name]=json.dumps(meta).encode()
+        r=_constraint_context_observation(data)
+        self.assertEqual(r['observation'],'BOUND_SNAPSHOTS_OBSERVED')
+        self.assertEqual(r['comparison']['comparison'],'DIFFERENT')
+        self.assertEqual(r['roles']['reference']['io_coverage']['data_port_count'],53)
+        self.assertEqual(r['full_constraint_gate'],'UNKNOWN')
+        meta['roles']['candidate']['outputs']['ports.tsv']='f'*64;data[name]=json.dumps(meta).encode()
+        self.assertEqual(_constraint_context_observation(data)['observation'],'HOLD_CONTEXT_BINDING')
     def test_changed_payload_fails_integrity_before_observations(self):
         with tempfile.TemporaryDirectory() as d:
             p=pathlib.Path(d);self.fixture(p);(p/'final-acceptance/output/sta/wns.rpt').write_text('wns max 1')

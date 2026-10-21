@@ -152,3 +152,43 @@ def compare_sdc(reference,candidate):
             result[label+'_contract_sha256']=hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
     except Unsupported as ex:result.update(comparison='UNKNOWN',reason=str(ex))
     return result
+
+
+def inspect_io_coverage(sdc,ports_tsv):
+    """Literal I/O declaration coverage, never complete timing/exception coverage."""
+    result={'schema':'verieda.io-coverage.v1','observation':'HOLD_PROFILE_OR_INVENTORY',
+            'full_constraint_gate':'UNKNOWN','missing_io_modes':[],
+            'scope':'declared min/max I/O modes against supplied port inventory; no internal endpoint/exception or physical clock-equivalence certificate'}
+    try:
+        if not isinstance(sdc,str) or not isinstance(ports_tsv,str) or max(len(sdc),len(ports_tsv))>2*1024*1024:raise Unsupported('bounded SDC and TSV text required')
+        ports={}
+        lines=ports_tsv.splitlines()
+        if not 1<=len(lines)<=65536:raise Unsupported('empty or excessive port inventory')
+        for line in lines:
+            fields=line.split('\t')
+            if len(fields)!=2:raise Unsupported('port name and native direction required')
+            name,direction=fields
+            if not name or len(name)>1024 or any(ord(c)<32 for c in name) or name in ports:raise Unsupported('ambiguous port inventory')
+            if direction not in ('INPUT','OUTPUT'):raise Unsupported('direction outside the supported I/O profile')
+            ports[name]=direction
+        model=normalize(sdc)
+        clocks={p for c in model['clocks'].values() for p in c['source']}
+        if any(ports.get(p)!='INPUT' for p in clocks):raise Unsupported('unresolved/non-input clock source')
+        coverage={}
+        for cmd,clock,port,mode,value in model['io_delays']:
+            expected='INPUT' if cmd=='set_input_delay' else 'OUTPUT'
+            if ports.get(port)!=expected:raise Unsupported('unresolved or directionally invalid I/O delay target')
+            coverage.setdefault(port,{}).setdefault(clock,set()).add(mode)
+        missing=[]
+        for port,direction in sorted(ports.items()):
+            if port in clocks:continue
+            assigned=coverage.get(port,{None:set()})
+            for clock,modes in sorted(assigned.items(),key=lambda x:str(x[0])):
+                absent=[m for m in ('min','max') if m not in modes]
+                if absent:missing.append({'port':port,'direction':direction,'clock':clock,'missing':absent})
+        result.update(observation='GAPS_WITHIN_LITERAL_PROFILE' if missing else 'COMPLETE_WITHIN_LITERAL_PROFILE',
+                      port_count=len(ports),data_port_count=len(ports)-len(clocks),clock_ports=sorted(clocks),
+                      missing_io_modes=missing,sdc_text_sha256=hashlib.sha256(sdc.encode()).hexdigest(),
+                      inventory_text_sha256=hashlib.sha256(ports_tsv.encode()).hexdigest())
+    except (ValueError,TypeError,KeyError) as ex:result['reason']=str(ex)
+    return result

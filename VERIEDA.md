@@ -359,3 +359,26 @@ CLI and Tcl grouping syntax passed; the script was not evaluated or run in EDA.
 All successful/violating min-report fixtures are synthetic. Native min stdout
 format and integration remain unverified; full constraint certification is still
 missing. The pending b19cc94 publication authorization excludes this local work.
+
+
+## Static I/O inventory coverage and native snapshot binding
+
+`python -m verieda inspect-io-coverage --sdc EXPORTED.sdc --ports PORTS.tsv`
+checks bounded supported literal SDC against native INPUT/OUTPUT port names.
+It reports missing min/max modes per port and clock, rejects unresolved targets,
+direction mismatch and duplicate ports, and never exempts reset by name. Clock
+ports are derived from create_clock sources. Internal endpoints, exceptions and
+physical clock semantics remain outside this profile; full_constraint_gate stays
+UNKNOWN even for COMPLETE_WITHIN_LITERAL_PROFILE.
+
+`inspect-acceptance` now rechecks native snapshot schema, original/final SDC and
+same-ODB binding, output SHA256, typed successful process statuses and matching
+unit/port contexts. It recomputes the SDC comparison rather than trusting the
+producer's comparison label. In the retained run, both snapshots cover 53 data
+ports plus one clock port, while network latency/propagated clock declarations
+remain DIFFERENT. This is not proof of constraint relaxation or equivalence.
+
+Checkpoint: 254 offline tests, 253 passed and one existing Linux test skipped.
+Real snapshot import, Python syntax, package hashes and diff checks passed.
+Original artifacts, constraint inputs and existing case IDs remain unchanged.
+This local increment is not included in the separately authorized b19cc94 job.
